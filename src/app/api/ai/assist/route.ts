@@ -108,15 +108,15 @@ const INSTRUCTIONS: Record<AssistKind, string> = {
     "You are a master productivity organizer and task architect. The user inputs rough, quick, comma-separated or disorganized task thoughts " +
     "(e.g., 'buy groceries, call client about project deadline, pay electricity bill, gym leg workout, review pull request'). " +
     "Your mission is to expand this into a comprehensive, point-to-point, beautifully organized task note document. " +
-    "1. Group into logical, emoji-tagged categories (e.g. 💼 Work & Clients, 🛒 Shopping & Errands, ⚡ Finance & Bills, 🏋️ Health & Fitness). " +
+    "1. Group into logical, emoji-tagged categories (e.g. 💼 Work & Projects, 🛒 Shopping & Errands, ⚡ Finance & Bills, 🏋️ Health & Fitness). " +
     "2. For each task, expand it into a clear, detailed, actionable item with practical context, priority (high/medium/low), time estimate (e.g. '15 mins'), and 2-4 subtasks. " +
-    "3. Generate whatsappFormatted: MUST strictly follow WhatsApp's official markdown formatting! WhatsApp DOES NOT support '[ ]' or '- [ ]' for checklists — never output '[ ]'. Instead, use: " +
-    "   - Native bullet lists with checkbox emojis: '- ◻️ *Task Title*' for pending tasks. For completed tasks, use '- ✅ ~*Task Title*~' (WhatsApp native strikethrough). " +
-    "   - Sub-details using WhatsApp blockquote syntax: '  > ⏱️ 20 mins | 🔴 High' and '  > ▫️ Subtask point'. " +
-    "   - Category headers in bold: '*━━━━━━━━━━━━━━━━━━━━━*' and '*🛒 SHOPPING & ERRANDS*'. " +
-    "   - Bold with *asterisks*, italics with _underscores_, strikethrough with ~tildes~. " +
-    "4. Generate markdownFormatted: Clean standard GitHub Flavored Markdown with headers (#, ##), bold (**), and standard markdown '- [ ]' checkboxes for Notion/GitHub/Obsidian. " +
-    "5. Provide 2-3 short productivity tips for executing the list smoothly. Respect the requested language (English, Hinglish, or Hindi) and requested style.",
+    "3. Generate whatsappFormatted: MUST strictly follow WhatsApp's official formatting rules. " +
+    "   - ZERO brackets like '[ ]' or '- [ ]' — WhatsApp DOES NOT support markdown checkboxes and they look ugly. Never output '[ ]'. " +
+    "   - Number each task clearly: '1. ◻️ *Task Title*', '2. ◻️ *Task Title*' for pending tasks. For completed tasks, use '✅ ~*1. Task Title*~'. " +
+    "   - Use bullet points: '  > • _Note:_ details' and for subtasks: '  > *Sub-steps:*' followed by '    ▪️ Subtask item'. " +
+    "   - Use bold with *asterisks*, italics with _underscores_, strikethrough with ~tildes~, and aesthetic dividers '*━━━━━━━━━━━━━━━━━━━━━*'. " +
+    "   - Use inline code backticks for highlighting time and priority so they render as highlighted badges in WhatsApp: '  > `⏱️ 45 mins` • `🔴 HIGH PRIORITY`'. " +
+    "4. LANGUAGE RULES: By default, ALWAYS generate in English. If the user explicitly provided their rough notes in Hindi or requested Hindi, generate in Hindi. If Hinglish, generate in Hinglish. Never translate to Hindi if the user wrote in English.",
 }
 
 /** Structured AI help for the My Life tools (parse, capture, subtasks, routine, extract, plan). */
@@ -236,6 +236,8 @@ function languageRule(kind: AssistKind, lang: "en" | "hi"): string {
       return lang === "hi"
         ? "Write the title, puzzle, hint and explanation in Hindi (Devanagari script). Give the answer in Hindi, and include Hindi, English and digit forms in acceptableAnswers."
         : "Write everything in English."
+    case "task-notes":
+      return "For task-notes: if the user input specifies language='hi' or the user's rough notes are written in Hindi (Devanagari), generate in Hindi. If language='hinglish', generate in Hinglish. Otherwise, by default ALWAYS generate in English. Never force Hindi when notes were entered in English."
     default:
       return `Write all generated text in ${L} only — never in any other language.`
   }

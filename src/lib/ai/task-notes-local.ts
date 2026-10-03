@@ -143,10 +143,14 @@ export function generateLocalTaskNotes(
     items: data.items,
   }))
 
-  const title = "Daily Action Plan & Task Notes"
-  const summary = `Structured ${itemsToProcess.length} actionable tasks across ${categories.length} categories. Prioritize high-impact items first.`
+  const isHindi = options.language === "hi" || (options.language === "auto" && /[\u0900-\u097F]/.test(roughInput))
 
-  // 3. Generate WhatsApp Formatted Text (Uses native WhatsApp markdown: - for bullet list, > for quotes, *bold*, ~strikethrough~)
+  const title = isHindi ? "दैनिक कार्य योजना एवं नोट्स" : "Daily Action Plan & Task Notes"
+  const summary = isHindi
+    ? `${categories.length} श्रेणियों में कुल ${itemsToProcess.length} कार्य व्यवस्थित किए गए हैं। उच्च प्राथमिकता वाले कार्यों को पहले पूरा करें।`
+    : `Structured ${itemsToProcess.length} actionable tasks across ${categories.length} categories. Prioritize high-impact items first.`
+
+  // 3. Generate WhatsApp Formatted Text (Zero [ ], native WhatsApp markdown, numbers, bold, highlights, bullets)
   let wa = `*📋 ${title.toUpperCase()}*\n`
   wa += `> _${summary}_\n\n`
 
@@ -159,61 +163,49 @@ export function generateLocalTaskNotes(
       const item = cat.items[i]
       const prioEmoji = item.priority === "high" ? "🔴" : item.priority === "medium" ? "🟡" : "🟢"
 
-      // WhatsApp native list item using - ◻️ for clean visual checkbox
-      wa += `- ◻️ *${item.task}*\n`
-      if (item.details) wa += `  > _${item.details}_\n`
-      wa += `  > ⏱️ ${item.timeEstimate} | ${prioEmoji} Priority: *${item.priority?.toUpperCase()}*\n`
+      // Real checkbox emoji with numbering: 1. ◻️ *Task Title* (never [ ])
+      wa += `${i + 1}. ◻️ *${item.task}*\n`
+      if (item.details) wa += `  > • _Note:_ ${item.details}\n`
+      wa += `  > \`⏱️ ${item.timeEstimate}\` • \`${prioEmoji} ${item.priority.toUpperCase()} PRIORITY\`\n`
 
       if (item.subtasks && item.subtasks.length > 0) {
+        wa += `  > *Sub-steps:*\n`
         for (const sub of item.subtasks) {
-          wa += `  > ▫️ ${sub}\n`
+          wa += `    ▪️ ${sub}\n`
         }
       }
       wa += `\n`
     }
   }
 
-  wa += `*💡 PRODUCTIVITY TIPS:*\n`
-  wa += `- Complete all 🔴 High priority tasks early in the morning.\n`
-  wa += `- Group similar errands together to save commute & mental energy.\n`
-  wa += `- Keep checking off items to maintain momentum!\n`
-
-  // 4. Generate Markdown Formatted Text
-  let md = `# 📋 ${title}\n\n`
-  md += `> ${summary}\n\n`
-
-  for (const cat of categories) {
-    md += `## ${cat.emoji} ${cat.name}\n\n`
-    for (const item of cat.items) {
-      const prioLabel = item.priority === "high" ? "🔴 High" : item.priority === "medium" ? "🟡 Medium" : "🟢 Low"
-      md += `- [ ] **${item.task}** *(⏱️ ${item.timeEstimate} · Priority: ${prioLabel})*\n`
-      if (item.details) {
-        md += `  - ${item.details}\n`
-      }
-      if (item.subtasks && item.subtasks.length > 0) {
-        for (const sub of item.subtasks) {
-          md += `  - [ ] ${sub}\n`
-        }
-      }
-      md += `\n`
-    }
+  wa += `*━━━━━━━━━━━━━━━━━━━━━*\n`
+  wa += isHindi ? `*💡 उत्पादकता सुझाव:*\n` : `*💡 PRODUCTIVITY TIPS:*\n`
+  if (isHindi) {
+    wa += `• 🔴 उच्च प्राथमिकता वाले कार्यों को सुबह सबसे पहले पूरा करें।\n`
+    wa += `• एक जैसे कार्यों को एक साथ करें ताकि समय और ऊर्जा की बचत हो सके।\n`
+    wa += `• कार्य पूरे होते ही चेक करें ताकि गति बनी रहे।\n`
+  } else {
+    wa += `• Complete all 🔴 High priority tasks early in the morning.\n`
+    wa += `• Group similar errands together to save commute & mental energy.\n`
+    wa += `• Check off completed items to maintain momentum!\n`
   }
-
-  md += `### 💡 Productivity Tips\n`
-  md += `- Tackle 🔴 High priority items first.\n`
-  md += `- Take a 5-minute breather between deep work sessions.\n`
-  md += `- Share this note on WhatsApp or save it to your LifeKit Tasks.\n`
 
   return {
     title,
     summary,
     categories,
     whatsappFormatted: wa,
-    markdownFormatted: md,
-    tips: [
-      "Complete all high-priority tasks before noon to beat decision fatigue.",
-      "Check off each subtask as soon as finished to build positive momentum.",
-      "Group quick phone calls and messages into one focused 20-minute block.",
-    ],
+    markdownFormatted: wa,
+    tips: isHindi
+      ? [
+          "उच्च प्राथमिकता वाले कार्यों को दोपहर से पहले पूरा करें।",
+          "प्रत्येक कार्य पूरा होते ही चेक करें ताकि आत्मविश्वास बना रहे।",
+          "त्वरित कॉल और संदेशों को एक समर्पित 20-मिनट के ब्लॉक में पूरा करें।",
+        ]
+      : [
+          "Complete all high-priority tasks before noon to beat decision fatigue.",
+          "Check off each subtask as soon as finished to build positive momentum.",
+          "Group quick phone calls and messages into one focused 20-minute block.",
+        ],
   }
 }

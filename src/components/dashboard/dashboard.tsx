@@ -3,9 +3,31 @@
 import Link from "next/link"
 import { useState } from "react"
 import { format } from "date-fns"
-import { motion } from "framer-motion"
-import { ChevronRight, FileText, GraduationCap, Images, LayoutGrid, ListTodo, Calculator, PenLine, Scan, SlidersHorizontal, Sparkles, UserRound } from "lucide-react"
-import { ToolCard } from "@/components/cards/tool-card"
+import { motion, AnimatePresence } from "framer-motion"
+import {
+  ArrowUpRight,
+  Calculator,
+  Calendar,
+  ChevronRight,
+  FilePen,
+  FileText,
+  GraduationCap,
+  Images,
+  LayoutGrid,
+  ListChecks,
+  ListTodo,
+  Moon,
+  PenLine,
+  Scan,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Sun,
+  Sunrise,
+  Sunset,
+  UserRound,
+  Wand2,
+} from "lucide-react"
 import { ResponsiveSheet } from "@/components/common/responsive-sheet"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -14,90 +36,369 @@ import { getTool } from "@/data/tools"
 import { useSettings } from "@/hooks/use-lifekit-data"
 import { useHydrated } from "@/hooks/use-store"
 import { greeting } from "@/lib/dates"
+import { cn } from "@/lib/utils"
 import type { DashboardPrefs } from "@/types"
 import { TodayRoutineWidget, TodayTasksWidget, UpcomingEventsWidget, WellnessWidget } from "./today-widgets"
 
-const QUICK_TOOLS = ["scan", "image-to-pdf", "ocr", "qr-generator", "smart-calculator", "reminders"] as const
-const QUICK_LABELS: Record<(typeof QUICK_TOOLS)[number], string> = {
-  scan: "Scan",
-  "image-to-pdf": "PDF",
-  ocr: "OCR",
-  "qr-generator": "QR",
-  "smart-calculator": "Calculator",
-  reminders: "Reminder",
+/* -------------------------------------------------- Spotlight Power Tools */
+
+interface SpotlightTool {
+  id: string
+  name: string
+  badge: string
+  description: string
+  href: string
+  icon: typeof Sparkles
+  gradient: string
+  iconBg: string
+  borderColor: string
+  badgeClass: string
 }
 
+const SPOTLIGHT_TOOLS: SpotlightTool[] = [
+  {
+    id: "task-notes",
+    name: "AI Task Notes",
+    badge: "WhatsApp Ready",
+    description: "Convert rough comma thoughts into neat WhatsApp bullet checklists.",
+    href: "/tools/task-notes",
+    icon: ListChecks,
+    gradient: "from-emerald-500/10 via-teal-500/5 to-transparent",
+    iconBg: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+    borderColor: "hover:border-emerald-500/40 border-emerald-500/20",
+    badgeClass: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
+  },
+  {
+    id: "image-enhancer",
+    name: "AI Image Enhancer",
+    badge: "4K & Tear Repair",
+    description: "Upscale photos to Ultra HD, deblur & heal scratches or torn pieces.",
+    href: "/tools/image-enhancer",
+    icon: Sparkles,
+    gradient: "from-violet-500/10 via-purple-500/5 to-transparent",
+    iconBg: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+    borderColor: "hover:border-violet-500/40 border-violet-500/20",
+    badgeClass: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/20",
+  },
+  {
+    id: "pdf-editor",
+    name: "PDF Editor",
+    badge: "Exact Font Match",
+    description: "Select & replace any text with matching font, sign and watermark.",
+    href: "/tools/pdf-editor",
+    icon: FilePen,
+    gradient: "from-rose-500/10 via-pink-500/5 to-transparent",
+    iconBg: "bg-rose-500/15 text-rose-600 dark:text-rose-400",
+    borderColor: "hover:border-rose-500/40 border-rose-500/20",
+    badgeClass: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/20",
+  },
+  {
+    id: "secure-share",
+    name: "SecureShare",
+    badge: "Zero-Knowledge",
+    description: "Share images, videos & PDFs with encrypted temporary public links.",
+    href: "/tools/secure-share",
+    icon: ShieldCheck,
+    gradient: "from-amber-500/10 via-orange-500/5 to-transparent",
+    iconBg: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+    borderColor: "hover:border-amber-500/40 border-amber-500/20",
+    badgeClass: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/20",
+  },
+]
+
+/* ------------------------------------------- Useful Tools Filter Categories */
+
+type UsefulCategory = "all" | "ai" | "docs" | "productivity" | "everyday"
+
+interface UsefulToolItem {
+  id: string
+  name: string
+  badge: string
+  desc: string
+  category: "ai" | "docs" | "productivity" | "everyday"
+  featured?: boolean
+}
+
+const USEFUL_TOOLS_LIST: UsefulToolItem[] = [
+  // AI
+  { id: "task-notes", name: "AI Task Notes", badge: "WhatsApp", desc: "Turn messy thoughts into WhatsApp tasks", category: "ai", featured: true },
+  { id: "image-enhancer", name: "AI Image Enhancer", badge: "4K Repair", desc: "Super-resolution & tear restoration", category: "ai", featured: true },
+  { id: "ai-writer", name: "AI Writer", badge: "Gemini", desc: "Draft emails & polished messages", category: "ai" },
+  { id: "summarizer", name: "Summarizer", badge: "TL;DR", desc: "Extract key points & action items", category: "ai" },
+  { id: "goal-planner", name: "Goal Planner", badge: "Planner", desc: "Turn goals into actionable steps", category: "ai" },
+
+  // Docs
+  { id: "pdf-editor", name: "PDF Editor", badge: "Visual Edit", desc: "In-place font replace & annotate", category: "docs", featured: true },
+  { id: "image-to-pdf", name: "Image to PDF", badge: "Fast", desc: "Convert multiple images to PDF", category: "docs", featured: true },
+  { id: "pdf-scanner", name: "PDF Scanner", badge: "Scanner", desc: "Scan physical documents into clean PDF", category: "docs" },
+  { id: "ocr", name: "OCR Extractor", badge: "Text", desc: "Extract editable text from images", category: "docs", featured: true },
+
+  // Productivity
+  { id: "todo", name: "Tasks & To-Dos", badge: "Daily", desc: "Priorities, checklists and subtasks", category: "productivity", featured: true },
+  { id: "routine-planner", name: "Daily Routine", badge: "Habits", desc: "Time-blocked daily schedule", category: "productivity" },
+  { id: "focus", name: "Focus Timer", badge: "Pomodoro", desc: "Timed deep focus sessions", category: "productivity" },
+  { id: "notes", name: "Quick Notes", badge: "Notes", desc: "Instant offline scratchpad", category: "productivity", featured: true },
+  { id: "reminders", name: "Reminders", badge: "Alerts", desc: "Never miss scheduled tasks", category: "productivity" },
+  { id: "calendar", name: "Calendar", badge: "Events", desc: "Interactive monthly agenda", category: "productivity" },
+
+  // Everyday
+  { id: "scan", name: "Scan Everything", badge: "Camera", desc: "One camera for QR, barcodes & text", category: "everyday", featured: true },
+  { id: "smart-calculator", name: "Smart Calculator", badge: "Natural Math", desc: "Calculate like '20% of 15000'", category: "everyday", featured: true },
+  { id: "secure-share", name: "SecureShare", badge: "Encrypted", desc: "Zero-knowledge file link sharing", category: "everyday", featured: true },
+  { id: "qr-generator", name: "QR Generator", badge: "Instant", desc: "Generate custom QR codes", category: "everyday", featured: true },
+  { id: "password-generator", name: "Password Gen", badge: "Secure", desc: "Strong random cryptographic keys", category: "everyday" },
+  { id: "unit-converter", name: "Unit Converter", badge: "Units", desc: "Lengths, weights and temperatures", category: "everyday" },
+]
+
+const CATEGORY_TABS: { key: UsefulCategory; label: string; icon: typeof Sparkles }[] = [
+  { key: "all", label: "All Top", icon: Sparkles },
+  { key: "ai", label: "AI Powered", icon: Wand2 },
+  { key: "docs", label: "PDF & Docs", icon: FileText },
+  { key: "productivity", label: "Productivity", icon: ListTodo },
+  { key: "everyday", label: "Everyday", icon: Calculator },
+]
+
 const UTILITY_GROUPS = [
-  { title: "Image Tools", description: "Resize, compress, convert", href: "/tools#images", icon: Images, accent: "bg-sky-500/10 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300" },
-  { title: "PDF Tools", description: "Create, edit, scan", href: "/tools#documents", icon: FileText, accent: "bg-rose-500/10 text-rose-600 dark:bg-rose-400/15 dark:text-rose-300" },
-  { title: "Scan Tools", description: "QR, barcode, OCR", href: "/tools#scan", icon: Scan, accent: "bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300" },
-  { title: "Calculators", description: "EMI, GST, percentage", href: "/tools#finance", icon: Calculator, accent: "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-300" },
+  { title: "Image Tools", description: "Enhance, resize, compress", href: "/tools#images", icon: Images, accent: "bg-sky-500/10 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300" },
+  { title: "PDF Tools", description: "Edit, scan, convert to PDF", href: "/tools#documents", icon: FileText, accent: "bg-rose-500/10 text-rose-600 dark:bg-rose-400/15 dark:text-rose-300" },
+  { title: "Scan Tools", description: "QR, barcode, camera OCR", href: "/tools#scan", icon: Scan, accent: "bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300" },
+  { title: "Calculators", description: "Smart, EMI, GST, units", href: "/tools#finance", icon: Calculator, accent: "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-300" },
   { title: "Productivity", description: "Tasks, routine, calendar", href: "/my-life#productivity", icon: ListTodo, accent: "bg-orange-500/10 text-orange-600 dark:bg-orange-400/15 dark:text-orange-300" },
   { title: "Personal", description: "Wellness, bookmarks, info", href: "/my-life#personal", icon: UserRound, accent: "bg-teal-500/10 text-teal-600 dark:bg-teal-400/15 dark:text-teal-300" },
-  { title: "AI Productivity", description: "Write, summarize, plan", href: "/tools#ai", icon: PenLine, accent: "bg-violet-500/10 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300" },
+  { title: "AI Productivity", description: "Task notes, write, plan", href: "/tools#ai", icon: PenLine, accent: "bg-violet-500/10 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300" },
   { title: "Learn Skills", description: "Prompting, English, logic", href: "/learn", icon: GraduationCap, accent: "bg-amber-500/10 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300" },
 ]
 
-const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }
-const item = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }
+function getGreetingVisual(now = new Date()) {
+  const h = now.getHours()
+  if (h < 5) return { icon: Moon, color: "text-indigo-400" }
+  if (h < 12) return { icon: Sunrise, color: "text-amber-500" }
+  if (h < 17) return { icon: Sun, color: "text-amber-500" }
+  return { icon: Sunset, color: "text-orange-500" }
+}
+
+const container = { hidden: {}, show: { transition: { staggerChildren: 0.04 } } }
+const item = { hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }
 
 export function Dashboard() {
   const hydrated = useHydrated()
   const { settings, update } = useSettings()
   const [customizing, setCustomizing] = useState(false)
+  const [activeCategory, setActiveCategory] = useState<UsefulCategory>("all")
+
   const prefs = settings.dashboard
   const name = hydrated && settings.displayName ? `, ${settings.displayName.split(" ")[0]}` : ""
   const widgets = prefs.todayWidgets
   const anyWidget = widgets.tasks || widgets.routine || widgets.events || widgets.wellness
 
+  const greetingVisual = getGreetingVisual()
+  const GreetingIcon = greetingVisual.icon
+
+  // Filter tools based on selected category tab
+  const displayedTools = USEFUL_TOOLS_LIST.filter((tool) => {
+    if (activeCategory === "all") return tool.featured === true
+    return tool.category === activeCategory
+  })
+
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
-      <header className="flex items-start justify-between gap-4">
+    <div className="mx-auto max-w-6xl space-y-7 pb-8 sm:space-y-9">
+      {/* ---------------------------------------------------- Hero Header */}
+      <header className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground" suppressHydrationWarning>
-            {hydrated ? format(new Date(), "EEEE, d MMMM") : " "}
-          </p>
-          <h1 className="mt-0.5 text-2xl font-semibold tracking-tight sm:text-3xl" suppressHydrationWarning>
+          <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground sm:text-sm">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/60 px-2.5 py-0.5 backdrop-blur-xs">
+              <Calendar className="size-3.5 text-primary" aria-hidden />
+              <span suppressHydrationWarning>
+                {hydrated ? format(new Date(), "EEEE, d MMMM") : "LifeKit"}
+              </span>
+            </span>
+            <span className="text-muted-foreground/50">•</span>
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <GreetingIcon className={cn("size-3.5", greetingVisual.color)} aria-hidden />
+              <span>Browser-First</span>
+            </span>
+          </div>
+
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-foreground sm:text-3xl lg:text-4xl" suppressHydrationWarning>
             {hydrated ? greeting() : "Hello"}
-            {name} <span aria-hidden>👋</span>
+            {name} <span className="inline-block animate-pulse" aria-hidden>👋</span>
           </h1>
-          <p className="mt-1 text-muted-foreground">Your everyday utility toolbox</p>
+
+          <p className="mt-0.5 text-sm text-muted-foreground sm:text-base">
+            Your private everyday utility toolbox • 100% on-device & encrypted
+          </p>
         </div>
-        <Button variant="outline" onClick={() => setCustomizing(true)} aria-label="Customize dashboard">
-          <SlidersHorizontal /> <span className="hidden sm:inline">Customize</span>
-        </Button>
+
+        <div className="flex items-center gap-2 self-start sm:self-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCustomizing(true)}
+            aria-label="Customize dashboard"
+            className="h-9 rounded-xl border-border/70 bg-card/80 px-3 shadow-xs hover:bg-muted/60"
+          >
+            <SlidersHorizontal className="size-4" />
+            <span className="text-xs font-medium sm:text-sm">Customize</span>
+          </Button>
+        </div>
       </header>
 
+      {/* --------------------------------- Spotlight Feature Highlights (Top 4) */}
       {prefs.showQuickTools && (
-        <section aria-labelledby="quick-tools">
-          <h2 id="quick-tools" className="sr-only">
-            Quick tools
-          </h2>
-          <motion.ul
+        <section aria-labelledby="spotlight-title" className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex size-6 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Sparkles className="size-3.5" aria-hidden />
+              </span>
+              <h2 id="spotlight-title" className="text-base font-semibold tracking-tight sm:text-lg">
+                Featured Power Tools
+              </h2>
+            </div>
+            <span className="text-xs text-muted-foreground">Most popular utilities</span>
+          </div>
+
+          <motion.div
             variants={container}
             initial="hidden"
             animate="show"
-            className="grid grid-cols-3 gap-1 rounded-3xl border bg-card p-2 sm:grid-cols-6 sm:p-3"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
           >
-            {QUICK_TOOLS.map((id) => (
-              <motion.li key={id} variants={item}>
-                <ToolCard tool={{ ...getTool(id), name: QUICK_LABELS[id] }} variant="quick" />
-              </motion.li>
-            ))}
-          </motion.ul>
+            {SPOTLIGHT_TOOLS.map((tool) => {
+              const Icon = tool.icon
+              return (
+                <motion.div key={tool.id} variants={item}>
+                  <Link
+                    href={tool.href}
+                    className={cn(
+                      "group relative flex h-full flex-col justify-between overflow-hidden rounded-2xl border bg-gradient-to-br p-4 sm:p-5 transition-all duration-200 hover:-translate-y-1 hover:shadow-soft active:scale-[0.98]",
+                      tool.gradient,
+                      tool.borderColor
+                    )}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className={cn("flex size-11 items-center justify-center rounded-xl shadow-xs transition-transform group-hover:scale-105", tool.iconBg)}>
+                          <Icon className="size-5" aria-hidden />
+                        </span>
+                        <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tracking-tight", tool.badgeClass)}>
+                          {tool.badge}
+                        </span>
+                      </div>
+
+                      <h3 className="mt-3.5 text-base font-semibold text-foreground group-hover:text-primary transition-colors">
+                        {tool.name}
+                      </h3>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2">
+                        {tool.description}
+                      </p>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between pt-2 border-t border-border/40 text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">
+                      <span>Launch tool</span>
+                      <ArrowUpRight className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
+                    </div>
+                  </Link>
+                </motion.div>
+              )
+            })}
+          </motion.div>
         </section>
       )}
 
-      {prefs.showToday && anyWidget && (
-        <section aria-labelledby="today-title">
-          <div className="mb-3 flex items-end justify-between">
-            <h2 id="today-title" className="text-lg font-semibold">
-              Today
+      {/* -------------------- Interactive "Most Useful Tools" Grid with Filter Tabs */}
+      {prefs.showQuickTools && (
+        <section aria-labelledby="useful-tools-title" className="space-y-3.5">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <h2 id="useful-tools-title" className="text-base font-semibold tracking-tight sm:text-lg">
+              Most Useful Tools
             </h2>
-            <Link href="/my-life" className="inline-flex items-center gap-0.5 text-sm text-muted-foreground hover:text-foreground">
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+              {CATEGORY_TABS.map((tab) => {
+                const isActive = activeCategory === tab.key
+                const TabIcon = tab.icon
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveCategory(tab.key)}
+                    className={cn(
+                      "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 font-medium transition-all active:scale-95",
+                      isActive
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "border border-border/60 bg-card/60 text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                    )}
+                  >
+                    <TabIcon className="size-3.5" aria-hidden />
+                    <span>{tab.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Tools Grid */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeCategory}
+              variants={container}
+              initial="hidden"
+              animate="show"
+              exit="hidden"
+              className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4"
+            >
+              {displayedTools.map((itemConfig) => {
+                const toolDef = getTool(itemConfig.id)
+                const Icon = toolDef.icon
+
+                return (
+                  <motion.div key={itemConfig.id} variants={item}>
+                    <Link
+                      href={toolDef.href}
+                      className="group flex h-full items-center gap-3 rounded-2xl border bg-card/90 p-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-card hover:shadow-soft active:scale-[0.98]"
+                    >
+                      <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105", toolDef.accent)}>
+                        <Icon className="size-5" aria-hidden />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="block truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                            {itemConfig.name}
+                          </span>
+                        </div>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {itemConfig.desc}
+                        </span>
+                      </div>
+                    </Link>
+                  </motion.div>
+                )
+              })}
+            </motion.div>
+          </AnimatePresence>
+        </section>
+      )}
+
+      {/* -------------------------------------------------------- Today Section */}
+      {prefs.showToday && anyWidget && (
+        <section aria-labelledby="today-title" className="space-y-3">
+          <div className="flex items-end justify-between">
+            <div>
+              <h2 id="today-title" className="text-base font-semibold tracking-tight sm:text-lg">
+                Today
+              </h2>
+              <p className="text-xs text-muted-foreground">Your day at a glance</p>
+            </div>
+            <Link
+              href="/my-life"
+              className="inline-flex items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
               My Life <ChevronRight className="size-4" aria-hidden />
             </Link>
           </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             {widgets.tasks && <TodayTasksWidget />}
             {widgets.routine && <TodayRoutineWidget />}
@@ -107,16 +408,24 @@ export function Dashboard() {
         </section>
       )}
 
+      {/* ---------------------------------------------------- All Utilities */}
       {prefs.showCategories && (
-        <section aria-labelledby="utilities-title">
-          <div className="mb-3 flex items-end justify-between">
-            <h2 id="utilities-title" className="text-lg font-semibold">
-              Utilities
-            </h2>
-            <Link href="/tools" className="inline-flex items-center gap-0.5 text-sm text-muted-foreground hover:text-foreground">
+        <section aria-labelledby="utilities-title" className="space-y-3">
+          <div className="flex items-end justify-between">
+            <div>
+              <h2 id="utilities-title" className="text-base font-semibold tracking-tight sm:text-lg">
+                Explore Categories
+              </h2>
+              <p className="text-xs text-muted-foreground">Browse all tools by domain</p>
+            </div>
+            <Link
+              href="/tools"
+              className="inline-flex items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
               All tools <ChevronRight className="size-4" aria-hidden />
             </Link>
           </div>
+
           <motion.ul
             variants={container}
             initial="hidden"
@@ -128,14 +437,18 @@ export function Dashboard() {
               <motion.li key={title} variants={item}>
                 <Link
                   href={href}
-                  className="group flex h-full items-center gap-3 rounded-2xl border bg-card p-3.5 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-soft sm:p-4"
+                  className="group flex h-full items-center gap-3 rounded-2xl border bg-card p-3.5 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-soft sm:p-4"
                 >
-                  <span className={`flex size-11 shrink-0 items-center justify-center rounded-xl ${accent}`}>
+                  <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105", accent)}>
                     <Icon className="size-5" aria-hidden />
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium sm:text-base">{title}</span>
-                    <span className="block truncate text-xs text-muted-foreground sm:text-sm">{description}</span>
+                    <span className="block text-sm font-medium text-foreground group-hover:text-primary transition-colors sm:text-base">
+                      {title}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground sm:text-sm">
+                      {description}
+                    </span>
                   </span>
                 </Link>
               </motion.li>
@@ -144,6 +457,7 @@ export function Dashboard() {
         </section>
       )}
 
+      {/* ------------------------------------------------------- Empty State */}
       {!prefs.showQuickTools && !(prefs.showToday && anyWidget) && !prefs.showCategories && (
         <div className="rounded-2xl border border-dashed p-10 text-center">
           <Sparkles className="mx-auto size-8 text-primary" aria-hidden />
@@ -158,6 +472,7 @@ export function Dashboard() {
         </div>
       )}
 
+      {/* --------------------------------------------------- Customize Sheet */}
       <CustomizeSheet
         open={customizing}
         onOpenChange={setCustomizing}
@@ -180,9 +495,9 @@ function CustomizeSheet({
   onChange: (p: DashboardPrefs) => void
 }) {
   const sections: { key: "showQuickTools" | "showToday" | "showCategories"; label: string; hint: string }[] = [
-    { key: "showQuickTools", label: "Quick tools", hint: "Scan, PDF, OCR, QR, Calculator, Reminder" },
-    { key: "showToday", label: "Today", hint: "Tasks, routine, events and wellness" },
-    { key: "showCategories", label: "Utilities", hint: "Shortcuts to tool groups" },
+    { key: "showQuickTools", label: "Featured & Quick tools", hint: "AI Task Notes, Enhancer, PDF, Scanner, Calc" },
+    { key: "showToday", label: "Today widgets", hint: "Tasks, routine, events and wellness overview" },
+    { key: "showCategories", label: "Category shortcuts", hint: "Direct links to tool domains" },
   ]
   const widgets: { key: keyof DashboardPrefs["todayWidgets"]; label: string }[] = [
     { key: "tasks", label: "Today's tasks" },
@@ -190,6 +505,7 @@ function CustomizeSheet({
     { key: "events", label: "Upcoming events" },
     { key: "wellness", label: "Wellness progress" },
   ]
+
   return (
     <ResponsiveSheet
       open={open}

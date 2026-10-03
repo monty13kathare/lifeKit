@@ -204,3 +204,11 @@
   background-size: 16px 16px;
   background-position: 0 0, 0 8px, 8px -8px, -8px 0;
 }
+
+/* Hide Turbopack / Next.js dev indicator badge from obscuring bottom navigation */
+nextjs-portal,
+[data-nextjs-toast],
+#nextjs-dev-overlay {
+  display: none !important;
+}
+

@@ -186,7 +186,7 @@ export const ASSIST_OUTPUT = {
       .min(1)
       .max(10),
     whatsappFormatted: z.string().min(1).max(12000),
-    markdownFormatted: z.string().min(1).max(12000),
+    markdownFormatted: z.string().max(12000).optional(),
     tips: z.array(z.string().max(300)).max(5).optional(),
   }),
 
