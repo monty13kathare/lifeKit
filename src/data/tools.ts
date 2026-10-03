@@ -33,6 +33,8 @@ import {
   Target,
   FileText,
   BookA,
+  Sparkles,
+  ListChecks,
   type LucideIcon,
 } from "lucide-react"
 
@@ -93,6 +95,7 @@ export const TOOLS: Tool[] = [
   { id: "ocr", name: "OCR", description: "Extract text from images.", href: "/tools/ocr", icon: ScanText, category: "documents", section: "tools", accent: A.violet },
 
   // Images
+  { id: "image-enhancer", name: "AI Image Enhancer", description: "Restore, deblur and upscale old or bad-quality photos to Ultra HD.", href: "/tools/image-enhancer", icon: Sparkles, category: "images", section: "tools", accent: A.violet },
   { id: "image-resizer", name: "Resize Image", description: "Change dimensions with handy presets.", href: "/tools/image-resizer", icon: Scaling, category: "images", section: "tools", accent: A.sky },
   { id: "image-compressor", name: "Compress Image", description: "Reduce image size quickly.", href: "/tools/image-compressor", icon: Minimize2, category: "images", section: "tools", accent: A.sky },
   { id: "image-converter", name: "Convert Image", description: "Switch between JPG, PNG and WebP.", href: "/tools/image-converter", icon: Repeat2, category: "images", section: "tools", accent: A.sky },
@@ -104,6 +107,7 @@ export const TOOLS: Tool[] = [
   { id: "qr-generator", name: "QR Generator", description: "Create QR codes for links and content.", href: "/tools/qr-generator", icon: QrCode, category: "scan", section: "tools", accent: A.indigo },
 
   // AI Productivity
+  { id: "task-notes", name: "AI Task Notes", description: "Convert rough comma-separated thoughts into detailed, point-by-point checklists for WhatsApp.", href: "/tools/task-notes", icon: ListChecks, category: "ai", section: "tools", accent: A.emerald },
   { id: "ai-writer", name: "AI Writer", description: "Draft, rewrite and translate emails and messages.", href: "/tools/ai-writer", icon: PenLine, category: "ai", section: "tools", accent: A.violet },
   { id: "summarizer", name: "Summarizer", description: "TL;DR, key points and action items from any text.", href: "/tools/summarizer", icon: FileText, category: "ai", section: "tools", accent: A.violet },
   { id: "goal-planner", name: "Goal Planner", description: "Turn a goal into milestones and tasks.", href: "/tools/goal-planner", icon: Target, category: "ai", section: "tools", accent: A.violet },

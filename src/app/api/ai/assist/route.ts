@@ -10,7 +10,7 @@ const bodySchema = z.object({
 })
 
 /** Jobs that benefit from more varied, creative output. */
-const CREATIVE = new Set<AssistKind>(["plan-day", "routine", "write", "goal-plan", "prompt-run", "english-quiz", "logic-puzzle", "decision-advice", "health-insights"])
+const CREATIVE = new Set<AssistKind>(["plan-day", "routine", "write", "goal-plan", "prompt-run", "english-quiz", "logic-puzzle", "decision-advice", "health-insights", "task-notes"])
 
 const DATE_RULES =
   "Resolve relative dates and times (today, tomorrow, next Friday, tonight, in 2 hours) against the user's current local date-time given below. " +
@@ -98,6 +98,25 @@ const INSTRUCTIONS: Record<AssistKind, string> = {
   "logic-check":
     "Judge whether the user's answer to the puzzle is correct, comparing it with the official answer (accept equivalent forms). " +
     "Give feedback: if correct, praise briefly and note any reasoning gap; if wrong, explain gently where the reasoning went wrong without just restating the full solution.",
+  "image-enhancer-advice":
+    "You are an expert digital imaging and photo restoration AI. Analyze the image characteristics described in the input JSON " +
+    "(file name, dimensions, aspect ratio, estimated noise/blur, color tone, user description). " +
+    "Recommend the optimal enhancement profile (recommendedPreset: 'ultra-hd' | 'old-photo' | 'deblur' | 'portrait' | 'custom'), " +
+    "scale ('1' | '2' | '4'), sharpness (0-100), denoise (0-100), clarity (0-100), vibrance (0-100), contrast (-50 to 50), brightness (-50 to 50), " +
+    "autoWhiteBalance (boolean), faceEnhance (boolean), and provide a concise diagnosis sentence and tip for the user.",
+  "task-notes":
+    "You are a master productivity organizer and task architect. The user inputs rough, quick, comma-separated or disorganized task thoughts " +
+    "(e.g., 'buy groceries, call client about project deadline, pay electricity bill, gym leg workout, review pull request'). " +
+    "Your mission is to expand this into a comprehensive, point-to-point, beautifully organized task note document. " +
+    "1. Group into logical, emoji-tagged categories (e.g. 💼 Work & Clients, 🛒 Shopping & Errands, ⚡ Finance & Bills, 🏋️ Health & Fitness). " +
+    "2. For each task, expand it into a clear, detailed, actionable item with practical context, priority (high/medium/low), time estimate (e.g. '15 mins'), and 2-4 subtasks. " +
+    "3. Generate whatsappFormatted: MUST strictly follow WhatsApp's official markdown formatting! WhatsApp DOES NOT support '[ ]' or '- [ ]' for checklists — never output '[ ]'. Instead, use: " +
+    "   - Native bullet lists with checkbox emojis: '- ◻️ *Task Title*' for pending tasks. For completed tasks, use '- ✅ ~*Task Title*~' (WhatsApp native strikethrough). " +
+    "   - Sub-details using WhatsApp blockquote syntax: '  > ⏱️ 20 mins | 🔴 High' and '  > ▫️ Subtask point'. " +
+    "   - Category headers in bold: '*━━━━━━━━━━━━━━━━━━━━━*' and '*🛒 SHOPPING & ERRANDS*'. " +
+    "   - Bold with *asterisks*, italics with _underscores_, strikethrough with ~tildes~. " +
+    "4. Generate markdownFormatted: Clean standard GitHub Flavored Markdown with headers (#, ##), bold (**), and standard markdown '- [ ]' checkboxes for Notion/GitHub/Obsidian. " +
+    "5. Provide 2-3 short productivity tips for executing the list smoothly. Respect the requested language (English, Hinglish, or Hindi) and requested style.",
 }
 
 /** Structured AI help for the My Life tools (parse, capture, subtasks, routine, extract, plan). */

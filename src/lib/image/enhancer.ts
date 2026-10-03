@@ -28,6 +28,8 @@ export interface EnhanceOptions {
   contrast: number
   /** Brightness / exposure compensation (-50 to +50, default 0) */
   brightness: number
+  /** Auto-levels dynamic range stretch & dehaze (removes murky grey fog) */
+  autoLevels: boolean
   /** Auto white balance & color cast removal (useful for faded/yellowed vintage photos) */
   autoWhiteBalance: boolean
   /** Face & skin-tone aware smoothing & feature enhancement */
@@ -48,16 +50,17 @@ export const ENHANCE_PRESETS: EnhancePreset[] = [
     id: "ultra-hd",
     name: "Ultra HD 4K",
     label: "🌟 Ultra HD 4K",
-    description: "4x Super-resolution with razor-sharp edges and high-definition details.",
+    description: "4x Super-resolution with razor-sharp edges and crystal-clear micro-details.",
     iconName: "Sparkles",
     options: {
       scale: 4,
-      sharpness: 75,
-      denoise: 30,
-      clarity: 45,
-      vibrance: 25,
-      contrast: 10,
+      sharpness: 85,
+      denoise: 25,
+      clarity: 65,
+      vibrance: 30,
+      contrast: 12,
       brightness: 4,
+      autoLevels: true,
       autoWhiteBalance: false,
       faceEnhance: false,
     },
@@ -66,16 +69,17 @@ export const ENHANCE_PRESETS: EnhancePreset[] = [
     id: "old-photo",
     name: "Restore Old Photo",
     label: "🕰️ Restore Old Photo",
-    description: "Revive faded colors, remove grain/scratches, and restore contrast & clarity.",
+    description: "Revive faded colors, remove grain, fix yellow casts, and restore crisp clarity.",
     iconName: "History",
     options: {
       scale: 2,
-      sharpness: 65,
-      denoise: 60,
-      clarity: 50,
+      sharpness: 75,
+      denoise: 50,
+      clarity: 60,
       vibrance: 45,
       contrast: 15,
-      brightness: 8,
+      brightness: 6,
+      autoLevels: true,
       autoWhiteBalance: true,
       faceEnhance: true,
     },
@@ -84,16 +88,17 @@ export const ENHANCE_PRESETS: EnhancePreset[] = [
     id: "deblur",
     name: "Deblur & Sharpen",
     label: "🔍 Deblur & Sharpen",
-    description: "Fix blurry photos, shaky camera shots, and unreadable text.",
+    description: "Fix blurry photos, out-of-focus camera shots, and unreadable text.",
     iconName: "Focus",
     options: {
       scale: 2,
-      sharpness: 90,
-      denoise: 25,
-      clarity: 65,
-      vibrance: 12,
-      contrast: 6,
+      sharpness: 95,
+      denoise: 20,
+      clarity: 75,
+      vibrance: 15,
+      contrast: 10,
       brightness: 2,
+      autoLevels: true,
       autoWhiteBalance: false,
       faceEnhance: false,
     },
@@ -106,12 +111,13 @@ export const ENHANCE_PRESETS: EnhancePreset[] = [
     iconName: "User",
     options: {
       scale: 2,
-      sharpness: 55,
-      denoise: 45,
-      clarity: 40,
-      vibrance: 20,
+      sharpness: 70,
+      denoise: 40,
+      clarity: 50,
+      vibrance: 25,
       contrast: 8,
-      brightness: 6,
+      brightness: 5,
+      autoLevels: true,
       autoWhiteBalance: true,
       faceEnhance: true,
     },
@@ -124,12 +130,13 @@ export const ENHANCE_PRESETS: EnhancePreset[] = [
     iconName: "Sliders",
     options: {
       scale: 2,
-      sharpness: 50,
-      denoise: 30,
-      clarity: 30,
-      vibrance: 20,
-      contrast: 0,
+      sharpness: 70,
+      denoise: 25,
+      clarity: 45,
+      vibrance: 25,
+      contrast: 5,
       brightness: 0,
+      autoLevels: true,
       autoWhiteBalance: false,
       faceEnhance: false,
     },
@@ -143,12 +150,18 @@ export const DEFAULT_ENHANCE_OPTIONS: EnhanceOptions = ENHANCE_PRESETS[0].option
  * Safe for browser execution with memory-conscious operations and canvas limits.
  */
 export async function enhanceImage(
-  source: HTMLImageElement | ImageBitmap | HTMLCanvasElement,
+  source: CanvasImageSource,
   options: EnhanceOptions,
   onProgress?: (progress: number, stepLabel: string) => void
 ): Promise<HTMLCanvasElement> {
-  const origW = "naturalWidth" in source ? source.naturalWidth : source.width
-  const origH = "naturalHeight" in source ? source.naturalHeight : source.height
+  const origW =
+    "naturalWidth" in source
+      ? (source as HTMLImageElement).naturalWidth
+      : (source as { width: number }).width
+  const origH =
+    "naturalHeight" in source
+      ? (source as HTMLImageElement).naturalHeight
+      : (source as { height: number }).height
 
   onProgress?.(0.1, "Initializing enhancement pipeline…")
 
@@ -286,67 +299,110 @@ export async function enhanceImage(
     }
   }
 
-  onProgress?.(0.7, "Reconstructing high-frequency textures & deblurring…")
+  onProgress?.(0.68, "Stretching dynamic range & removing haze (Auto-Levels)…")
 
-  // 5. Contrast-Adaptive Sharpening (CAS) & Deblur
+  // 5. Auto-Levels (Percentile Dynamic Range Stretch & Dehazing)
+  if (options.autoLevels) {
+    const hist = new Uint32Array(256)
+    let sampleCount = 0
+    const step = Math.max(1, Math.floor(len / 60000)) * 4
+
+    for (let i = 0; i < len; i += step) {
+      const lum = Math.round(data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114)
+      hist[lum]++
+      sampleCount++
+    }
+
+    const minCut = sampleCount * 0.008
+    const maxCut = sampleCount * 0.992
+    let acc = 0
+    let pLow = 0
+    let pHigh = 255
+
+    for (let i = 0; i < 256; i++) {
+      acc += hist[i]
+      if (pLow === 0 && acc >= minCut) pLow = i
+      if (acc >= maxCut) {
+        pHigh = i
+        break
+      }
+    }
+
+    // Stretch range if there is a foggy compression or dull dynamic range
+    if (pHigh > pLow + 15) {
+      const invRange = 255 / (pHigh - pLow)
+      for (let i = 0; i < len; i += 4) {
+        data[i] = Math.max(0, Math.min(255, Math.round((data[i] - pLow) * invRange)))
+        data[i + 1] = Math.max(0, Math.min(255, Math.round((data[i + 1] - pLow) * invRange)))
+        data[i + 2] = Math.max(0, Math.min(255, Math.round((data[i + 2] - pLow) * invRange)))
+      }
+    }
+  }
+
+  onProgress?.(0.78, "Reconstructing razor-sharp Ultra HD textures & contours…")
+
+  // 6. Dual-Tier High-Frequency Laplacian Super-Sharpening & Deblur
   if (options.sharpness > 5) {
     const sharpAmount = options.sharpness / 100
     const copy = new Uint8ClampedArray(data)
     const w = targetW
     const h = targetH
+    const sharpFactor = 0.15 + sharpAmount * 0.42
 
     for (let y = 1; y < h - 1; y++) {
       const rowOffset = y * w * 4
+      const topOffset = (y - 1) * w * 4
+      const btmOffset = (y + 1) * w * 4
+
       for (let x = 1; x < w - 1; x++) {
         const i = rowOffset + x * 4
-
-        // Center pixel
         const cr = copy[i]
         const cg = copy[i + 1]
         const cb = copy[i + 2]
 
-        // 4 Cross neighbors: Top, Bottom, Left, Right
-        const t = i - w * 4
-        const b = i + w * 4
-        const l = i - 4
-        const r = i + 4
+        // 8 Neighbors for full 2D detail recovery
+        const l = rowOffset + (x - 1) * 4
+        const r = rowOffset + (x + 1) * 4
+        const t = topOffset + x * 4
+        const b = btmOffset + x * 4
+        const tl = topOffset + (x - 1) * 4
+        const tr = topOffset + (x + 1) * 4
+        const bl = btmOffset + (x - 1) * 4
+        const br = btmOffset + (x + 1) * 4
 
-        // Process green / luminance as primary guide to avoid color fringing
-        const lumCenter = cr * 0.299 + cg * 0.587 + cb * 0.114
-        const lumT = copy[t] * 0.299 + copy[t + 1] * 0.587 + copy[t + 2] * 0.114
-        const lumB = copy[b] * 0.299 + copy[b + 1] * 0.587 + copy[b + 2] * 0.114
-        const lumL = copy[l] * 0.299 + copy[l + 1] * 0.587 + copy[l + 2] * 0.114
-        const lumR = copy[r] * 0.299 + copy[r + 1] * 0.587 + copy[r + 2] * 0.114
+        // Local min/max bounds to suppress ringing halos around high-contrast edges
+        const minR = Math.min(copy[l], copy[r], copy[t], copy[b])
+        const maxR = Math.max(copy[l], copy[r], copy[t], copy[b])
+        const minG = Math.min(copy[l + 1], copy[r + 1], copy[t + 1], copy[b + 1])
+        const maxG = Math.max(copy[l + 1], copy[r + 1], copy[t + 1], copy[b + 1])
+        const minB = Math.min(copy[l + 2], copy[r + 2], copy[t + 2], copy[b + 2])
+        const maxB = Math.max(copy[l + 2], copy[r + 2], copy[t + 2], copy[b + 2])
 
-        const minLum = Math.min(lumCenter, lumT, lumB, lumL, lumR)
-        const maxLum = Math.max(lumCenter, lumT, lumB, lumL, lumR)
+        // 8-neighbor weighted Laplacian high-pass detail:
+        // Cross neighbors weight 1.0, diagonal neighbors weight 0.5
+        const detailR = cr * 6 - (copy[t] + copy[b] + copy[l] + copy[r] + (copy[tl] + copy[tr] + copy[bl] + copy[br]) * 0.5)
+        const detailG = cg * 6 - (copy[t + 1] + copy[b + 1] + copy[l + 1] + copy[r + 1] + (copy[tl + 1] + copy[tr + 1] + copy[bl + 1] + copy[br + 1]) * 0.5)
+        const detailB = cb * 6 - (copy[t + 2] + copy[b + 2] + copy[l + 2] + copy[r + 2] + (copy[tl + 2] + copy[tr + 2] + copy[bl + 2] + copy[br + 2]) * 0.5)
 
-        // Adaptive contrast factor: high in blurry texture areas, suppressed in pure flats/extremes
-        const contrastRange = maxLum - minLum
-        if (contrastRange > 2) {
-          const amp = Math.min(1, Math.sqrt(Math.min(minLum, 255 - maxLum) / Math.max(1, maxLum)))
-          const weight = (0.04 + sharpAmount * 0.14) * amp
+        const sharpR = cr + detailR * sharpFactor
+        const sharpG = cg + detailG * sharpFactor
+        const sharpB = cb + detailB * sharpFactor
 
-          const newR = cr * (1 + 4 * weight) - (copy[t] + copy[b] + copy[l] + copy[r]) * weight
-          const newG = cg * (1 + 4 * weight) - (copy[t + 1] + copy[b + 1] + copy[l + 1] + copy[r + 1]) * weight
-          const newB = cb * (1 + 4 * weight) - (copy[t + 2] + copy[b + 2] + copy[l + 2] + copy[r + 2]) * weight
-
-          // Clamp against local min/max to prevent overshoot or ringing halos
-          data[i] = Math.max(0, Math.min(255, Math.round(newR)))
-          data[i + 1] = Math.max(0, Math.min(255, Math.round(newG)))
-          data[i + 2] = Math.max(0, Math.min(255, Math.round(newB)))
-        }
+        // Clamp to relaxed local envelope to avoid overshoot halos
+        data[i] = Math.max(0, Math.min(255, Math.round(Math.max(minR - 8, Math.min(maxR + 8, sharpR)))))
+        data[i + 1] = Math.max(0, Math.min(255, Math.round(Math.max(minG - 8, Math.min(maxG + 8, sharpG)))))
+        data[i + 2] = Math.max(0, Math.min(255, Math.round(Math.max(minB - 8, Math.min(maxB + 8, sharpB)))))
       }
     }
   }
 
-  onProgress?.(0.85, "Reviving color vibrance, clarity & contrast…")
+  onProgress?.(0.9, "Enhancing color vibrance, depth & micro-contrast…")
 
-  // 6. Color Vibrance, Contrast, Brightness & Micro-Clarity Adjustment
+  // 7. Color Vibrance, Contrast, Brightness & Micro-Clarity Adjustment
   const contrastFactor = (options.contrast + 100) / 100
   const brightnessOffset = options.brightness * 1.5
   const vibranceStrength = options.vibrance / 100
-  const clarityBonus = (options.clarity / 100) * 0.25
+  const clarityBonus = (options.clarity / 100) * 0.35
 
   for (let i = 0; i < len; i += 4) {
     let r = data[i]
@@ -367,10 +423,9 @@ export async function enhanceImage(
       b = (b - 128) * contrastFactor + 128 + brightnessOffset
     }
 
-    // Micro-Clarity (Luminance S-curve adjustment)
+    // Micro-Clarity (Luminance S-curve depth adjustment)
     if (options.clarity > 5) {
       const lum = r * 0.299 + g * 0.587 + b * 0.114
-      // S-curve boosts midtone micro-contrast
       const normLum = lum / 255
       const sCurve = normLum < 0.5 ? 2 * normLum * normLum : 1 - 2 * (1 - normLum) * (1 - normLum)
       const diff = (sCurve * 255 - lum) * clarityBonus
@@ -384,7 +439,7 @@ export async function enhanceImage(
       const maxC = Math.max(r, g, b)
       const minC = Math.min(r, g, b)
       const sat = (maxC - minC) / Math.max(1, maxC)
-      const boost = (1 - sat) * vibranceStrength * 0.8
+      const boost = (1 - sat) * vibranceStrength * 0.9
       const avg = (r + g + b) / 3
       r += (r - avg) * boost
       g += (g - avg) * boost
@@ -396,7 +451,7 @@ export async function enhanceImage(
     data[i + 2] = Math.max(0, Math.min(255, Math.round(b)))
   }
 
-  // 7. Write Back to Canvas
+  // 8. Write Back to Canvas
   ctx.putImageData(imgData, 0, 0)
   onProgress?.(1, "Complete! Ultra HD image ready.")
 
