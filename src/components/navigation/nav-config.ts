@@ -1,15 +1,28 @@
-import { Ellipsis, GraduationCap, House, LayoutGrid, Scan, Settings, Sparkles, type LucideIcon } from "lucide-react"
+import {
+  Ellipsis,
+  GraduationCap,
+  House,
+  LayoutGrid,
+  ListTodo,
+  Scan,
+  Settings,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react"
 import { TOOLS } from "@/data/tools"
 
 export interface NavItem {
   href: string
   label: string
   icon: LucideIcon
+  /** If true, renders as the raised FAB-style center button */
+  isFab?: boolean
 }
 
 export const NAV = {
   home: { href: "/", label: "Home", icon: House },
   tools: { href: "/tools", label: "Tools", icon: LayoutGrid },
+  tasks: { href: "/tools/todo", label: "Tasks", icon: ListTodo },
   life: { href: "/my-life", label: "My Life", icon: Sparkles },
   learn: { href: "/learn", label: "Learn", icon: GraduationCap },
   scan: { href: "/scan", label: "Scan", icon: Scan },
@@ -18,7 +31,14 @@ export const NAV = {
 } satisfies Record<string, NavItem>
 
 export const DESKTOP_NAV: NavItem[] = [NAV.home, NAV.tools, NAV.life, NAV.learn, NAV.scan, NAV.settings]
-export const MOBILE_NAV: NavItem[] = [NAV.home, NAV.tools, NAV.scan, NAV.life, NAV.more]
+/** Mobile bottom bar: Home | Tools | [Tasks FAB] | My Life | More */
+export const MOBILE_NAV: NavItem[] = [
+  NAV.home,
+  NAV.tools,
+  { ...NAV.tasks, isFab: true },
+  NAV.life,
+  NAV.more,
+]
 
 /** Which top-level nav item a pathname belongs to. */
 export function activeNavHref(pathname: string): string {
@@ -33,3 +53,4 @@ export function activeNavHref(pathname: string): string {
   if (pathname.startsWith("/tools")) return "/tools"
   return pathname
 }
+

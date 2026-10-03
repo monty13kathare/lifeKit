@@ -10,7 +10,7 @@ export type TaskNotesOutput = AssistOutput<"task-notes">
 export interface GenerateOptions {
   style?: "whatsapp" | "detailed" | "meeting" | "routine" | "standard"
   detailLevel?: "standard" | "deep"
-  language?: "en" | "hi" | "hinglish"
+  language?: "en" | "hi" | "hinglish" | "auto"
 }
 
 interface KeywordRule {

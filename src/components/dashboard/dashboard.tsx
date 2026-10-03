@@ -121,33 +121,36 @@ interface UsefulToolItem {
 
 const USEFUL_TOOLS_LIST: UsefulToolItem[] = [
   // AI
-  { id: "task-notes", name: "AI Task Notes", badge: "WhatsApp", desc: "Turn messy thoughts into WhatsApp tasks", category: "ai", featured: true },
+  { id: "task-notes", name: "AI Task Notes", badge: "WhatsApp", desc: "Turn rough thoughts into WhatsApp tasks", category: "ai", featured: true },
   { id: "image-enhancer", name: "AI Image Enhancer", badge: "4K Repair", desc: "Super-resolution & tear restoration", category: "ai", featured: true },
-  { id: "ai-writer", name: "AI Writer", badge: "Gemini", desc: "Draft emails & polished messages", category: "ai" },
+  { id: "ai-writer", name: "AI Writer", badge: "Gemini", desc: "Draft emails & polished messages", category: "ai", featured: true },
   { id: "summarizer", name: "Summarizer", badge: "TL;DR", desc: "Extract key points & action items", category: "ai" },
-  { id: "goal-planner", name: "Goal Planner", badge: "Planner", desc: "Turn goals into actionable steps", category: "ai" },
+  { id: "goal-planner", name: "Goal Planner", badge: "Planner", desc: "Turn goals into actionable milestones", category: "ai" },
+  { id: "decision-helper", name: "Decision Helper", badge: "Matrix", desc: "Pros/cons matrix to pick wisely", category: "ai" },
 
   // Docs
   { id: "pdf-editor", name: "PDF Editor", badge: "Visual Edit", desc: "In-place font replace & annotate", category: "docs", featured: true },
   { id: "image-to-pdf", name: "Image to PDF", badge: "Fast", desc: "Convert multiple images to PDF", category: "docs", featured: true },
-  { id: "pdf-scanner", name: "PDF Scanner", badge: "Scanner", desc: "Scan physical documents into clean PDF", category: "docs" },
   { id: "ocr", name: "OCR Extractor", badge: "Text", desc: "Extract editable text from images", category: "docs", featured: true },
+  { id: "pdf-scanner", name: "PDF Scanner", badge: "Scanner", desc: "Scan physical documents into clean PDF", category: "docs" },
 
   // Productivity
   { id: "todo", name: "Tasks & To-Dos", badge: "Daily", desc: "Priorities, checklists and subtasks", category: "productivity", featured: true },
-  { id: "routine-planner", name: "Daily Routine", badge: "Habits", desc: "Time-blocked daily schedule", category: "productivity" },
-  { id: "focus", name: "Focus Timer", badge: "Pomodoro", desc: "Timed deep focus sessions", category: "productivity" },
   { id: "notes", name: "Quick Notes", badge: "Notes", desc: "Instant offline scratchpad", category: "productivity", featured: true },
+  { id: "routine-planner", name: "Daily Routine", badge: "Habits", desc: "Time-blocked daily schedule", category: "productivity", featured: true },
+  { id: "calendar", name: "Calendar", badge: "Events", desc: "Interactive monthly agenda", category: "productivity", featured: true },
   { id: "reminders", name: "Reminders", badge: "Alerts", desc: "Never miss scheduled tasks", category: "productivity" },
-  { id: "calendar", name: "Calendar", badge: "Events", desc: "Interactive monthly agenda", category: "productivity" },
+  { id: "focus", name: "Focus Timer", badge: "Pomodoro", desc: "Timed deep focus sessions", category: "productivity" },
 
   // Everyday
-  { id: "scan", name: "Scan Everything", badge: "Camera", desc: "One camera for QR, barcodes & text", category: "everyday", featured: true },
-  { id: "smart-calculator", name: "Smart Calculator", badge: "Natural Math", desc: "Calculate like '20% of 15000'", category: "everyday", featured: true },
+  { id: "smart-calculator", name: "Smart Calculator", badge: "Natural Math", desc: "Type '20% of 15000' naturally", category: "everyday", featured: true },
   { id: "secure-share", name: "SecureShare", badge: "Encrypted", desc: "Zero-knowledge file link sharing", category: "everyday", featured: true },
-  { id: "qr-generator", name: "QR Generator", badge: "Instant", desc: "Generate custom QR codes", category: "everyday", featured: true },
-  { id: "password-generator", name: "Password Gen", badge: "Secure", desc: "Strong random cryptographic keys", category: "everyday" },
-  { id: "unit-converter", name: "Unit Converter", badge: "Units", desc: "Lengths, weights and temperatures", category: "everyday" },
+  { id: "qr-generator", name: "QR Generator", badge: "Instant", desc: "Generate custom QR codes instantly", category: "everyday", featured: true },
+  { id: "password-generator", name: "Password Gen", badge: "Secure", desc: "Strong random cryptographic keys", category: "everyday", featured: true },
+  { id: "unit-converter", name: "Unit Converter", badge: "Units", desc: "Length, weight, temperature & more", category: "everyday" },
+  { id: "emi-calculator", name: "EMI Calculator", badge: "Finance", desc: "Monthly loan & interest breakdown", category: "everyday" },
+  { id: "gst-calculator", name: "GST Calculator", badge: "Tax", desc: "Add/remove GST with CGST/SGST split", category: "everyday" },
+  { id: "wellness", name: "Wellness Tracker", badge: "Health", desc: "Water, sleep, steps & mood log", category: "everyday" },
 ]
 
 const CATEGORY_TABS: { key: UsefulCategory; label: string; icon: typeof Sparkles }[] = [
@@ -159,14 +162,14 @@ const CATEGORY_TABS: { key: UsefulCategory; label: string; icon: typeof Sparkles
 ]
 
 const UTILITY_GROUPS = [
+  { title: "Productivity", description: "Tasks, routine, focus, reminders", href: "/my-life#productivity", icon: ListTodo, accent: "bg-orange-500/10 text-orange-600 dark:bg-orange-400/15 dark:text-orange-300" },
+  { title: "AI Productivity", description: "Task notes, write, summarize, plan", href: "/tools#ai", icon: PenLine, accent: "bg-violet-500/10 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300" },
+  { title: "PDF & Docs", description: "Edit, scan, convert to PDF", href: "/tools#documents", icon: FileText, accent: "bg-rose-500/10 text-rose-600 dark:bg-rose-400/15 dark:text-rose-300" },
   { title: "Image Tools", description: "Enhance, resize, compress", href: "/tools#images", icon: Images, accent: "bg-sky-500/10 text-sky-600 dark:bg-sky-400/15 dark:text-sky-300" },
-  { title: "PDF Tools", description: "Edit, scan, convert to PDF", href: "/tools#documents", icon: FileText, accent: "bg-rose-500/10 text-rose-600 dark:bg-rose-400/15 dark:text-rose-300" },
-  { title: "Scan Tools", description: "QR, barcode, camera OCR", href: "/tools#scan", icon: Scan, accent: "bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300" },
   { title: "Calculators", description: "Smart, EMI, GST, units", href: "/tools#finance", icon: Calculator, accent: "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-300" },
-  { title: "Productivity", description: "Tasks, routine, calendar", href: "/my-life#productivity", icon: ListTodo, accent: "bg-orange-500/10 text-orange-600 dark:bg-orange-400/15 dark:text-orange-300" },
   { title: "Personal", description: "Wellness, bookmarks, info", href: "/my-life#personal", icon: UserRound, accent: "bg-teal-500/10 text-teal-600 dark:bg-teal-400/15 dark:text-teal-300" },
-  { title: "AI Productivity", description: "Task notes, write, plan", href: "/tools#ai", icon: PenLine, accent: "bg-violet-500/10 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300" },
-  { title: "Learn Skills", description: "Prompting, English, logic", href: "/learn", icon: GraduationCap, accent: "bg-amber-500/10 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300" },
+  { title: "Security", description: "Passwords & encrypted sharing", href: "/tools#security", icon: ShieldCheck, accent: "bg-amber-500/10 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300" },
+  { title: "Learn Skills", description: "Prompting, English, logic", href: "/learn", icon: GraduationCap, accent: "bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300" },
 ]
 
 function getGreetingVisual(now = new Date()) {
@@ -347,7 +350,7 @@ export function Dashboard() {
               initial="hidden"
               animate="show"
               exit="hidden"
-              className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4"
+              className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
             >
               {displayedTools.map((itemConfig) => {
                 const toolDef = getTool(itemConfig.id)
@@ -357,21 +360,20 @@ export function Dashboard() {
                   <motion.div key={itemConfig.id} variants={item}>
                     <Link
                       href={toolDef.href}
-                      className="group flex h-full items-center gap-3 rounded-2xl border bg-card/90 p-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-card hover:shadow-soft active:scale-[0.98]"
+                      className="group flex h-full items-center gap-3 rounded-2xl border bg-card/90 p-3.5 transition-all duration-150 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-card hover:shadow-soft active:scale-[0.98]"
                     >
-                      <span className={cn("flex size-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105", toolDef.accent)}>
-                        <Icon className="size-5" aria-hidden />
+                      <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105", toolDef.accent)}>
+                        <Icon className="size-[18px]" aria-hidden />
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="block truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
-                            {itemConfig.name}
-                          </span>
-                        </div>
-                        <span className="block truncate text-xs text-muted-foreground">
+                        <span className="block truncate text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                          {itemConfig.name}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground leading-snug">
                           {itemConfig.desc}
                         </span>
                       </div>
+                      <ArrowUpRight className="size-4 shrink-0 text-muted-foreground/40 transition-all group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
                     </Link>
                   </motion.div>
                 )

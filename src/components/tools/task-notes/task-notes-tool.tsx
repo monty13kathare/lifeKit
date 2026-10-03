@@ -315,6 +315,7 @@ export function TaskNotesTool() {
   const handleAddToLifeKitTasks = () => {
     if (!output) return
     let count = 0
+    const now = new Date().toISOString()
     for (const cat of output.categories) {
       for (const item of cat.items) {
         addTask({
@@ -323,10 +324,12 @@ export function TaskNotesTool() {
           category: cat.name,
           priority: item.priority || "medium",
           completed: item.completed,
+          recurrence: "none",
+          createdAt: now,
           subtasks: (item.subtasks || []).map((st) => ({
             id: crypto.randomUUID(),
             title: st,
-            completed: false,
+            done: false,
           })),
         })
         count++
@@ -338,11 +341,13 @@ export function TaskNotesTool() {
   // Save to LifeKit Notes
   const handleSaveToLifeKitNotes = () => {
     if (!output) return
+    const now = new Date().toISOString()
     addNote({
       title: output.title,
       content: output.whatsappFormatted,
-      category: "Tasks",
-      pinned: false,
+      source: "manual",
+      createdAt: now,
+      updatedAt: now,
     })
     toast.success("Saved to LifeKit Notes!")
   }

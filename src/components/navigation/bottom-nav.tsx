@@ -17,23 +17,36 @@ export function BottomNav() {
       className="fixed inset-x-0 bottom-0 z-40 border-t border-border/50 bg-background/90 pb-safe backdrop-blur-xl supports-backdrop-filter:bg-background/80 shadow-lg lg:hidden"
     >
       <ul className="mx-auto grid max-w-md grid-cols-5 items-center px-1">
-        {MOBILE_NAV.map(({ href, label, icon: Icon }) => {
-          const isActive = active === href
-          const isScan = href === "/scan"
+        {MOBILE_NAV.map(({ href, label, icon: Icon, isFab }) => {
+          const isActive = href === "/tools/todo"
+            ? pathname === "/tools/todo"
+            : active === href
 
-          if (isScan) {
+          if (isFab) {
             return (
               <li key={href} className="flex justify-center">
                 <Link
                   href={href}
-                  aria-label="Scan QR, barcodes and documents"
+                  aria-label="Go to Tasks"
                   className="group relative -translate-y-2 flex flex-col items-center justify-center active:scale-95 transition-transform"
                 >
-                  <span className="flex size-12 items-center justify-center rounded-2xl bg-gradient-to-tr from-primary via-indigo-500 to-violet-600 text-white shadow-md shadow-primary/35 transition-all group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-primary/40 ring-4 ring-background">
+                  <span
+                    className={cn(
+                      "flex size-12 items-center justify-center rounded-2xl text-white shadow-md transition-all group-hover:scale-105 group-hover:shadow-lg ring-4 ring-background",
+                      isActive
+                        ? "bg-gradient-to-tr from-emerald-500 via-teal-500 to-emerald-600 shadow-emerald-500/40 group-hover:shadow-emerald-500/50"
+                        : "bg-gradient-to-tr from-emerald-600 via-teal-500 to-emerald-500 shadow-emerald-500/35 group-hover:shadow-emerald-500/45"
+                    )}
+                  >
                     <Icon className="size-6" aria-hidden />
                   </span>
-                  <span className="mt-1 text-[10px] font-semibold text-foreground/80 group-hover:text-primary">
-                    Scan
+                  <span
+                    className={cn(
+                      "mt-1 text-[10px] font-semibold transition-colors",
+                      isActive ? "text-emerald-600 dark:text-emerald-400" : "text-foreground/80 group-hover:text-emerald-500"
+                    )}
+                  >
+                    {label}
                   </span>
                 </Link>
               </li>
@@ -85,4 +98,3 @@ export function BottomNav() {
     </nav>
   )
 }
-
