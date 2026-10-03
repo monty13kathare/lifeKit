@@ -3,8 +3,8 @@ import { ToolPage } from "@/components/common/tool-page"
 import { SecureShare } from "@/components/tools/secure-share/secure-share"
 
 export const metadata: Metadata = {
-  title: "SecureShare",
-  description: "Encrypt files in your browser into a password-protected package with an expiry, then share it yourself.",
+  title: "SecureShare — Zero-Knowledge Public File Sharing",
+  description: "Upload multiple images, videos, PDFs and files to generate end-to-end encrypted share links with expiry.",
 }
 
 export default function SecureSharePage() {

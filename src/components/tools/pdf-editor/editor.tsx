@@ -11,6 +11,7 @@ import {
   Copy,
   Download,
   Ellipsis,
+  FilePenLine,
   FilePlus,
   FileText,
   Highlighter,
@@ -77,6 +78,7 @@ export interface EditorSession {
 
 const TOOLS: { id: Tool; label: string; icon: typeof Type; shortcut: string }[] = [
   { id: "select", label: "Select", icon: MousePointer2, shortcut: "V" },
+  { id: "edit-text", label: "Edit text", icon: FilePenLine, shortcut: "E" },
   { id: "text", label: "Text", icon: Type, shortcut: "T" },
   { id: "draw", label: "Draw", icon: PenLine, shortcut: "D" },
   { id: "highlight", label: "Highlight", icon: Highlighter, shortcut: "H" },
@@ -467,7 +469,7 @@ export function PdfEditorWorkspace({ session, onClose }: { session: EditorSessio
 
   const fontNotice = (
     <p className="text-xs text-muted-foreground">
-      Added text uses the standard Helvetica font, which covers Latin characters only. Other scripts are replaced with “?”.
+      Replaced text automatically matches the original font family, weight, and color. Added text uses standard PDF fonts.
     </p>
   )
 

@@ -114,3 +114,24 @@ export function upcomingGroup(task: Task, today: string): UpcomingGroup | null {
 }
 
 export const formatShortDate = (date: string) => format(fromDateString(date), "EEE, MMM d")
+
+/** "45m", "1h 20m", "2h" — for focused-time meta on cards. */
+export function formatFocusMinutes(minutes: number): string {
+  const m = Math.max(0, Math.round(minutes))
+  const h = Math.floor(m / 60)
+  const r = m % 60
+  if (!h) return `${r}m`
+  return r ? `${h}h ${r}m` : `${h}h`
+}
+
+/** Matches title, notes, subtask titles and category (case-insensitive). */
+export function matchesQuery(task: Task, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  return (
+    task.title.toLowerCase().includes(q) ||
+    (task.notes ?? "").toLowerCase().includes(q) ||
+    task.category.toLowerCase().includes(q) ||
+    task.subtasks.some((s) => s.title.toLowerCase().includes(q))
+  )
+}

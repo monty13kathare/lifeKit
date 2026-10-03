@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS: Settings = {
   installPromptDismissed: false,
   seeded: false,
   currency: "₹",
+  aiLanguage: "en",
 }
 
 export const settingsStore = createValueStore<Settings>("settings", DEFAULT_SETTINGS)

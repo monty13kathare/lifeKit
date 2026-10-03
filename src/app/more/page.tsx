@@ -1,11 +1,12 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { Bell, ChevronRight, Info, NotebookPen, Settings, ShieldCheck } from "lucide-react"
+import { Bell, ChevronRight, GraduationCap, Info, NotebookPen, Settings, ShieldCheck } from "lucide-react"
 import { InstallCard } from "@/components/layout/install-card"
 
 export const metadata: Metadata = { title: "More" }
 
 const LINKS = [
+  { href: "/learn", label: "Learn Skills", description: "AI prompting, English and logic practice", icon: GraduationCap },
   { href: "/settings", label: "Settings", description: "Theme, profile, dashboard and data", icon: Settings },
   { href: "/tools/reminders", label: "Reminders", description: "Local reminders and notifications", icon: Bell },
   { href: "/tools/notes", label: "Notes", description: "Saved notes and extracted text", icon: NotebookPen },

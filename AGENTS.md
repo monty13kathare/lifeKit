@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # LifeKit conventions
 
-LifeKit is a **frontend-only** Next.js 16 PWA. No backend, no API routes, no server actions, no fake network calls. Everything runs in the browser.
+LifeKit is a **frontend-first** Next.js 16 PWA. Everything runs in the browser — no database, no auth, no server actions, no fake network calls. The **only** server code is the optional Google Gemini proxy (see "AI" below).
 
 ## UI kit: shadcn/ui on **Base UI** (not Radix)
 Components in `src/components/ui` wrap `@base-ui/react`. Differences from Radix-era shadcn:
@@ -33,6 +33,10 @@ Components in `src/components/ui` wrap `@base-ui/react`. Differences from Radix-
 - pdf.js: `src/lib/pdf/pdfjs.ts` (`loadPdfJs`, `openPdf`, `renderPdfPage`).
 - Reminders logic: `src/lib/reminders.ts`; the global scheduler is mounted in `providers.tsx`.
 - Service interfaces for future backend: `src/lib/services/*` (`FileService`, `TranslationService`, `UserService`). UI talks to interfaces, local adapters implement them.
+- AI (Google Gemini): server-only code lives in `src/lib/ai/*.server.ts` (`import "server-only"`) and route handlers under `src/app/api/` (`/api/ai/status`, `/api/ai/text`, `/api/ai/assist`). The key is `GEMINI_API_KEY` in `.env` — never `NEXT_PUBLIC_`. Client code uses `src/lib/ai/client.ts`, `useAiStatus()`, `useTranslationService()` and `<AiTextActions>`; every AI feature must hide itself when `configured` is false and tell users their text goes to Google. New AI routes must call `assertSameOrigin` + `assertRateLimit`, validate with zod and cap input size.
+- Structured AI jobs: add a kind to `ASSIST_OUTPUT` in `src/lib/ai/assist-schemas.ts` (zod output schema) plus its instruction in `src/app/api/ai/assist/route.ts`; call it with `aiAssist(kind, input)`. Convert AI output to records with `src/lib/ai/convert.ts`. Always show a preview the user confirms before saving AI-created items.
+- Focus timer: engine in `src/lib/focus.ts` (state in `focusTimerStore`), finished by the global `<FocusTicker />`; UI only calls engine actions. Calendar event alerts and reminders are fired by `<ReminderScheduler />`.
+- Learn Skills: progress API in `src/lib/learn/progress.ts` (`awardXp`, `completeLesson`, `recordBest`, `reviewCard`), hook `useLearn()`, header `<TrackHeader track>`. Tracks live in `src/components/learn/<track>/` with content in `src/data/learn/`.
 
 ## Rules
 - Heavy libraries (`pdf-lib`, `pdfjs-dist`, `tesseract.js`, `html5-qrcode`, `jszip`, `browser-image-compression`, `qrcode`, `jsbarcode`) must be loaded with `await import(...)` inside handlers/effects or via `next/dynamic` — never top-level imports in route files.

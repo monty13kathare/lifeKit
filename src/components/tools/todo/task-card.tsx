@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react"
 import { motion } from "framer-motion"
-import { CalendarClock, ChevronDown, ListChecks, MoreVertical, Pencil, Plus, Repeat, Trash2, X } from "lucide-react"
+import { CalendarClock, ChevronDown, Copy, ListChecks, MoreVertical, Pencil, Plus, Repeat, Sparkles, Timer, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -17,7 +17,7 @@ import { toDateString } from "@/lib/dates"
 import { createId } from "@/lib/storage/core"
 import { cn } from "@/lib/utils"
 import type { Subtask, Task } from "@/types"
-import { dueLabel, isOverdue, PRIORITY_META, RECURRENCE_LABEL } from "./task-utils"
+import { dueLabel, formatFocusMinutes, isOverdue, PRIORITY_META, RECURRENCE_LABEL } from "./task-utils"
 
 /** Round, animated completion checkbox. */
 export function CheckCircle({
@@ -76,12 +76,29 @@ export interface TaskCardProps {
   onDelete?: (task: Task) => void
   /** Enables inline subtask add/toggle/delete. */
   onSubtasksChange?: (task: Task, subtasks: Subtask[]) => void
+  /** Start a Focus session linked to this task. */
+  onFocus?: (task: Task) => void
+  /** Create a fresh copy of this task. */
+  onDuplicate?: (task: Task) => void
+  /** AI "Break into subtasks" (pass only when AI is configured). */
+  onBreakDown?: (task: Task) => void
   /** Smaller card for dashboards: no menu, no subtask panel. */
   compact?: boolean
   className?: string
 }
 
-export function TaskCard({ task, onToggle, onEdit, onDelete, onSubtasksChange, compact, className }: TaskCardProps) {
+export function TaskCard({
+  task,
+  onToggle,
+  onEdit,
+  onDelete,
+  onSubtasksChange,
+  onFocus,
+  onDuplicate,
+  onBreakDown,
+  compact,
+  className,
+}: TaskCardProps) {
   const now = useNow()
   const today = toDateString(now)
   const [expanded, setExpanded] = useState(false)
@@ -190,6 +207,12 @@ export function TaskCard({ task, onToggle, onEdit, onDelete, onSubtasksChange, c
                 </span>
               )
             ) : null}
+            {task.focusMinutes && task.focusMinutes > 0 && !compact ? (
+              <span className="inline-flex h-6 items-center gap-1 rounded-full bg-surface-muted px-2 text-muted-foreground">
+                <Timer className="size-3.5" aria-hidden />
+                {formatFocusMinutes(task.focusMinutes)} focused
+              </span>
+            ) : null}
           </div>
 
           {total > 0 && !compact ? (
@@ -253,7 +276,7 @@ export function TaskCard({ task, onToggle, onEdit, onDelete, onSubtasksChange, c
           ) : null}
         </div>
 
-        {!compact && (onEdit || onDelete || canEditSubtasks) ? (
+        {!compact && (onEdit || onDelete || canEditSubtasks || onFocus || onDuplicate || onBreakDown) ? (
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
@@ -262,15 +285,30 @@ export function TaskCard({ task, onToggle, onEdit, onDelete, onSubtasksChange, c
             >
               <MoreVertical aria-hidden />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="end" className="w-52">
               {onEdit ? (
                 <DropdownMenuItem onClick={() => onEdit(task)}>
                   <Pencil aria-hidden /> Edit
                 </DropdownMenuItem>
               ) : null}
+              {onFocus && !task.completed ? (
+                <DropdownMenuItem onClick={() => onFocus(task)}>
+                  <Timer aria-hidden /> Start focus
+                </DropdownMenuItem>
+              ) : null}
               {canEditSubtasks ? (
                 <DropdownMenuItem onClick={() => setExpanded(true)}>
                   <ListChecks aria-hidden /> {total ? "Show subtasks" : "Add subtasks"}
+                </DropdownMenuItem>
+              ) : null}
+              {onBreakDown && !task.completed ? (
+                <DropdownMenuItem onClick={() => onBreakDown(task)}>
+                  <Sparkles aria-hidden /> Break into subtasks
+                </DropdownMenuItem>
+              ) : null}
+              {onDuplicate ? (
+                <DropdownMenuItem onClick={() => onDuplicate(task)}>
+                  <Copy aria-hidden /> Duplicate
                 </DropdownMenuItem>
               ) : null}
               {onDelete ? (

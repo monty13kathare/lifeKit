@@ -14,9 +14,13 @@ interface AgendaViewProps {
   occurrences: EventOccurrence[]
   now: Date
   onEventClick: (o: EventOccurrence) => void
+  /** Event id to emphasise briefly. */
+  highlightId?: string | null
+  /** Override the empty state (e.g. for search results). */
+  empty?: { title: string; description: string }
 }
 
-export function AgendaView({ rangeStart, rangeEnd, occurrences, now, onEventClick }: AgendaViewProps) {
+export function AgendaView({ rangeStart, rangeEnd, occurrences, now, onEventClick, highlightId, empty }: AgendaViewProps) {
   const groups: { day: Date; items: EventOccurrence[] }[] = []
   for (let d = startOfDay(rangeStart); d < rangeEnd; d = addDays(d, 1)) {
     const items = occurrencesOn(occurrences, d)
@@ -27,8 +31,8 @@ export function AgendaView({ rangeStart, rangeEnd, occurrences, now, onEventClic
     return (
       <EmptyState
         icon={CalendarCheck2}
-        title="Nothing scheduled in this period"
-        description="Use the arrows to look further ahead, or create an event."
+        title={empty?.title ?? "Nothing scheduled in this period"}
+        description={empty?.description ?? "Use the arrows to look further ahead, or create an event."}
       />
     )
   }
@@ -49,7 +53,7 @@ export function AgendaView({ rangeStart, rangeEnd, occurrences, now, onEventClic
             <ul className="space-y-2">
               {items.map((o) => (
                 <li key={o.key}>
-                  <EventCard occurrence={o} onClick={onEventClick} />
+                  <EventCard occurrence={o} onClick={onEventClick} highlight={highlightId === o.event.id} />
                 </li>
               ))}
             </ul>

@@ -3,10 +3,19 @@
 import { useMemo, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { addHours, addMinutes, differenceInCalendarDays, format, formatDistanceStrict } from "date-fns"
-import { AlarmClock, Bell, Check, Clock, MoreVertical, Pencil, Plus, Repeat, RotateCcw, Trash2 } from "lucide-react"
+import { AlarmClock, Bell, Check, Clock, MoreVertical, Pencil, Plus, Repeat, RotateCcw, Search, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 import { EmptyState } from "@/components/common/empty-state"
 import { ToolPage } from "@/components/common/tool-page"
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -17,18 +26,23 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useNow } from "@/components/tools/calendar/use-now"
 import { useReminders } from "@/hooks/use-lifekit-data"
 import { useHydrated } from "@/hooks/use-store"
+import type { AiReminder } from "@/lib/ai/assist-schemas"
+import { aiReminderToReminder } from "@/lib/ai/convert"
 import { combineDateTime, toDateString } from "@/lib/dates"
 import { latestOccurrence, nextOccurrence, reminderState, type ReminderState } from "@/lib/reminders"
 import { cn } from "@/lib/utils"
 import type { Reminder } from "@/types"
 import { NotificationCard } from "./notification-card"
-import { REPEAT_ITEMS, ReminderFormSheet, type ReminderDraft } from "./reminder-form"
+import { ReminderFormSheet, type ReminderDraft } from "./reminder-form"
+import { ReminderNlBar } from "./reminder-nl-bar"
+import { describeRepeat } from "./reminder-utils"
 
-type SheetState = { open: boolean; reminder?: Reminder }
+type SheetState = { open: boolean; reminder?: Reminder; defaults?: ReminderDraft }
 
 interface Row {
   reminder: Reminder
@@ -43,8 +57,6 @@ const GROUPS: { state: ReminderState; title: string }[] = [
   { state: "missed", title: "Missed" },
   { state: "done", title: "Done" },
 ]
-
-const REPEAT_LABEL = Object.fromEntries(REPEAT_ITEMS.map((r) => [r.value, r.label])) as Record<Reminder["repeat"], string>
 
 /** "Today 9:00 AM", "Tomorrow 9:00 AM", "Monday 9:00 AM", "Oct 20, 9:00 AM". */
 export function formatWhen(d: Date, now: Date): string {
@@ -64,12 +76,21 @@ export function relativeWhen(d: Date, now: Date): string {
 
 export function RemindersApp() {
   const hydrated = useHydrated()
-  const { reminders, add, update, remove, upsert } = useReminders()
+  const { reminders, add, update, remove, upsert, set } = useReminders()
   const now = useNow()
   const [sheet, setSheet] = useState<SheetState>({ open: false })
+  const [query, setQuery] = useState("")
+  const [confirmClear, setConfirmClear] = useState(false)
+
+  const q = query.trim().toLowerCase()
+  const visible = useMemo(
+    () => (q ? reminders.filter((r) => r.title.toLowerCase().includes(q) || (r.notes ?? "").toLowerCase().includes(q)) : reminders),
+    [reminders, q]
+  )
+  const doneCount = reminders.filter((r) => r.done).length
 
   const groups = useMemo(() => {
-    const rows: Row[] = reminders.map((r) => {
+    const rows: Row[] = visible.map((r) => {
       const state = reminderState(r, now)
       const when =
         state === "upcoming"
@@ -84,7 +105,7 @@ export function RemindersApp() {
       )
       return { ...g, rows: list }
     }).filter((g) => g.rows.length)
-  }, [reminders, now])
+  }, [visible, now])
 
   /* --------------------------------------------------------- actions */
 
@@ -106,7 +127,38 @@ export function RemindersApp() {
   }
 
   const snooze = (r: Reminder, minutes: number) => {
-    const at = minutes >= 60 ? addHours(new Date(), minutes / 60) : addMinutes(new Date(), minutes)
+    const current = new Date()
+    const at = minutes >= 60 ? addHours(current, minutes / 60) : addMinutes(current, minutes)
+    if (r.repeat !== "none") {
+      // Keep the series: add a one-off copy at the snoozed time and mark this occurrence handled.
+      const occ = latestOccurrence(r, current)
+      const next = nextOccurrence(r, current)
+      const copy = add({
+        title: `Snoozed: ${r.title}`.slice(0, 120),
+        date: toDateString(at),
+        time: format(at, "HH:mm"),
+        repeat: "none",
+        notes: r.notes,
+        done: false,
+        createdAt: current.toISOString(),
+      })
+      update(r.id, {
+        ...(occ ? { lastFiredFor: occ.toISOString() } : {}),
+        // Move the anchor to the next occurrence (same cadence) so this one no longer shows as due.
+        ...(next ? { date: toDateString(next) } : {}),
+      })
+      toast(`Snoozed until ${format(at, "h:mm a")}`, {
+        description: next ? `${r.title} · series continues ${formatWhen(next, current)}` : r.title,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            remove(copy.id)
+            upsert(r)
+          },
+        },
+      })
+      return
+    }
     update(r.id, { date: toDateString(at), time: format(at, "HH:mm"), done: false, lastFiredFor: undefined })
     toast(`Snoozed until ${format(at, "h:mm a")}`, { description: r.title, action: { label: "Undo", onClick: () => upsert(r) } })
   }
@@ -120,6 +172,31 @@ export function RemindersApp() {
     remove(r.id)
     setSheet({ open: false })
     toast("Reminder deleted", { description: r.title, action: { label: "Undo", onClick: () => upsert(r) } })
+  }
+
+  const clearDone = () => {
+    const removed = reminders.filter((r) => r.done)
+    if (!removed.length) return
+    const ids = new Set(removed.map((r) => r.id))
+    set((prev) => prev.filter((r) => !ids.has(r.id)))
+    setConfirmClear(false)
+    toast(`Cleared ${removed.length} done ${removed.length === 1 ? "reminder" : "reminders"}`, {
+      action: { label: "Undo", onClick: () => set((prev) => [...prev.filter((r) => !ids.has(r.id)), ...removed]) },
+    })
+  }
+
+  const saveParsed = (parsed: AiReminder) => {
+    const r = aiReminderToReminder(parsed)
+    add(r)
+    toast.success("Reminder set", {
+      description: `${r.title} · ${formatWhen(combineDateTime(r.date, r.time), new Date())}`,
+      action: { label: "Undo", onClick: () => remove(r.id) },
+    })
+  }
+
+  const editParsed = (parsed: AiReminder) => {
+    const r = aiReminderToReminder(parsed)
+    setSheet({ open: true, defaults: { title: r.title, date: r.date, time: r.time, repeat: r.repeat, notes: r.notes } })
   }
 
   const submit = (draft: ReminderDraft) => {
@@ -149,6 +226,49 @@ export function RemindersApp() {
     >
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-6">
+          <ReminderNlBar onSave={saveParsed} onEdit={editParsed} />
+          {hydrated && reminders.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-0 flex-1 basis-48">
+                <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                <Input
+                  type="text"
+                  inputMode="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape" && query) {
+                      e.preventDefault()
+                      setQuery("")
+                    }
+                  }}
+                  placeholder="Search reminders"
+                  aria-label="Search reminders"
+                  className="h-10 pr-9 pl-9"
+                />
+                {query ? (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    aria-label="Clear search"
+                    className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                  >
+                    <X className="size-4" aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+              {doneCount > 0 ? (
+                <Button variant="outline" onClick={() => setConfirmClear(true)}>
+                  <Trash2 aria-hidden /> Clear done ({doneCount})
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          {q ? (
+            <p className="sr-only" role="status">
+              {visible.length} {visible.length === 1 ? "reminder matches" : "reminders match"} “{query.trim()}”
+            </p>
+          ) : null}
           {!hydrated ? (
             <div className="space-y-3" aria-busy="true" aria-label="Loading reminders">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -163,6 +283,17 @@ export function RemindersApp() {
               action={
                 <Button size="lg" onClick={() => setSheet({ open: true })}>
                   <Plus aria-hidden /> Create Reminder
+                </Button>
+              }
+            />
+          ) : visible.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              title="No reminders match your search."
+              description={`Nothing found for “${query.trim()}”.`}
+              action={
+                <Button variant="outline" onClick={() => setQuery("")}>
+                  Clear search
                 </Button>
               }
             />
@@ -227,9 +358,27 @@ export function RemindersApp() {
         open={sheet.open}
         onOpenChange={(open) => setSheet((s) => ({ ...s, open }))}
         reminder={sheet.reminder}
+        defaults={sheet.defaults}
         onSubmit={submit}
         onDelete={deleteReminder}
       />
+
+      <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear done reminders?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes {doneCount} completed {doneCount === 1 ? "reminder" : "reminders"}. You can undo right after.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={clearDone}>
+              Clear done
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ToolPage>
   )
 }
@@ -252,7 +401,8 @@ function ReminderRow({
   onDelete: (r: Reminder) => void
 }) {
   const { reminder: r, state, when } = row
-  const canSnooze = r.repeat === "none" && (state === "due" || state === "missed")
+  const canSnooze = state === "due" || (r.repeat === "none" && state === "missed")
+  const repeatText = describeRepeat(r)
   const whenText =
     state === "upcoming"
       ? `${formatWhen(when, now)} · ${relativeWhen(when, now)}`
@@ -304,9 +454,9 @@ function ReminderRow({
           </span>
           {r.notes ? <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">{r.notes}</span> : null}
         </button>
-        {r.repeat !== "none" ? (
+        {repeatText ? (
           <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-surface-muted px-2 py-0.5 text-xs text-muted-foreground">
-            <Repeat className="size-3" aria-hidden /> {REPEAT_LABEL[r.repeat]}
+            <Repeat className="size-3 shrink-0" aria-hidden /> {repeatText}
           </span>
         ) : null}
 
@@ -344,11 +494,11 @@ function ReminderRow({
               <RotateCcw aria-hidden /> Mark not done
             </DropdownMenuItem>
           ) : null}
-          {r.repeat === "none" && state !== "done" ? (
+          {(r.repeat === "none" && state !== "done") || (r.repeat !== "none" && state === "due") ? (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuLabel>Snooze from now</DropdownMenuLabel>
+                <DropdownMenuLabel>{r.repeat === "none" ? "Snooze from now" : "Snooze this time"}</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => onSnooze(r, 10)}>
                   <AlarmClock aria-hidden /> 10 minutes
                 </DropdownMenuItem>

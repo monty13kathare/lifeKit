@@ -21,7 +21,6 @@ import {
   Smile,
   type LucideIcon,
 } from "lucide-react"
-import { Notice } from "@/components/common/notice"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -37,9 +36,6 @@ import { cn } from "@/lib/utils"
 import type { WellnessDay, WellnessGoals } from "@/types"
 import { GoalsSheet } from "./goals-sheet"
 import { ProgressRing, WeeklyBars, type WeeklyPoint } from "./wellness-charts"
-
-const DISCLAIMER =
-  "LifeKit is not a medical device and does not provide medical advice or diagnosis. Consult a healthcare professional about health concerns."
 
 const MOODS: { value: number; label: string; icon: LucideIcon }[] = [
   { value: 1, label: "Very low", icon: Frown },
@@ -87,8 +83,6 @@ export function WellnessTracker() {
 
   return (
     <div className="space-y-5">
-      <Notice tone="info">{DISCLAIMER}</Notice>
-
       {/* Date switcher */}
       <div className="flex items-center gap-2 rounded-2xl border bg-card p-2 shadow-soft">
         <Button variant="ghost" size="icon" aria-label="Previous day" onClick={() => shift(-1)}>
@@ -464,7 +458,6 @@ function WeeklyProgress({ byId, goals, endDate }: { byId: Map<string, WellnessDa
 function TrackerSkeleton() {
   return (
     <div className="space-y-5" aria-busy="true" aria-label="Loading wellness data">
-      <Skeleton className="h-16 rounded-xl" />
       <Skeleton className="h-14 rounded-2xl" />
       <Skeleton className="h-48 rounded-2xl" />
       <div className="grid gap-5 lg:grid-cols-2">

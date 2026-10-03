@@ -3,7 +3,21 @@
 import { useEffect, useRef, useState } from "react"
 import { format } from "date-fns"
 import { z } from "zod"
-import { Download, Eye, EyeOff, KeyRound, Link2, Loader2, Lock, RotateCcw, Share2, Sparkles, X } from "lucide-react"
+import {
+  Download,
+  Eye,
+  EyeOff,
+  Globe,
+  KeyRound,
+  Link2,
+  Loader2,
+  Lock,
+  QrCode,
+  RotateCcw,
+  Share2,
+  Sparkles,
+  X,
+} from "lucide-react"
 import { toast } from "sonner"
 import { CopyButton } from "@/components/common/copy-button"
 import { FileDropzone } from "@/components/common/file-dropzone"
@@ -16,6 +30,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { generatePassphrase } from "@/components/tools/password-generator/generator"
 import { WORDLIST } from "@/components/tools/password-generator/wordlist"
 import { downloadBlob, formatBytes, MB } from "@/lib/files"
+import { renderQrCanvas } from "@/lib/qr/render"
 import { services } from "@/lib/services"
 import { getShareService, MAX_SHARE_BYTES, PBKDF2_ITERATIONS, ShareError, type ShareResult, type ShareStage } from "@/lib/services/share"
 import { cn } from "@/lib/utils"
@@ -35,7 +50,9 @@ const PRESETS: { id: Preset; label: string; ms?: number }[] = [
 const STAGE_LABEL: Record<ShareStage, string> = {
   reading: "Reading files…",
   "deriving-key": "Strengthening your password…",
-  encrypting: "Encrypting…",
+  encrypting: "Encrypting with AES-256…",
+  uploading: "Uploading encrypted package to cloud relay…",
+  downloading: "Downloading encrypted package…",
   decrypting: "Decrypting…",
   done: "Done",
 }
@@ -64,6 +81,7 @@ export function CreateShare() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [allowDownload, setAllowDownload] = useState(true)
+  const [isPublicLink, setIsPublicLink] = useState(true)
   const [notes, setNotes] = useState("")
   const [stage, setStage] = useState<ShareStage | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -118,11 +136,12 @@ export function CreateShare() {
         password: password || undefined,
         allowDownload,
         notes,
+        isPublicLink,
         onStage: setStage,
       })
       if (result) service.release(result)
       setResult(res)
-      toast.success("Encrypted package ready")
+      toast.success(res.publicUrl ? "Public share link generated!" : "Encrypted package ready")
     } catch (err) {
       setFailure(
         err instanceof ShareError
@@ -157,8 +176,8 @@ export function CreateShare() {
             maxBytes={MAX_SHARE_BYTES}
             warnBytes={50 * MB}
             onFiles={addFiles}
-            title="Choose files to protect"
-            hint="Any file type · encrypted on this device"
+            title="Choose files to share securely"
+            hint="Multiple images, videos, PDFs or documents · encrypted locally"
           />
         ) : (
           <>
@@ -207,6 +226,18 @@ export function CreateShare() {
       </div>
 
       <section aria-label="Protection settings" className="space-y-5 rounded-2xl border bg-card p-4 shadow-soft sm:p-5 lg:sticky lg:top-6">
+        <div className="flex items-start justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
+          <Label htmlFor="ss-public-link" className="font-normal cursor-pointer">
+            <span className="font-medium text-foreground flex items-center gap-1.5">
+              <Globe className="size-4 text-primary" /> Generate Public Link
+            </span>
+            <span className="block text-xs text-muted-foreground mt-0.5">
+              Uploads AES-256 encrypted package to ephemeral cloud so anyone with the link can open it anywhere.
+            </span>
+          </Label>
+          <Switch id="ss-public-link" checked={isPublicLink} onCheckedChange={setIsPublicLink} />
+        </div>
+
         <fieldset className="space-y-2">
           <legend className="mb-2 text-sm font-medium">Expires after</legend>
           <div className="grid grid-cols-4 gap-1.5">
@@ -244,7 +275,7 @@ export function CreateShare() {
 
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2">
-            <Label htmlFor="ss-password">Password (optional)</Label>
+            <Label htmlFor="ss-password">Password protection (optional)</Label>
             <Button
               type="button"
               variant="ghost"
@@ -266,6 +297,7 @@ export function CreateShare() {
               onChange={(e) => setPassword(e.target.value)}
               aria-invalid={!!errors.password}
               aria-describedby="ss-password-help"
+              placeholder="Leave empty for 1-click decrypt link"
               className="pr-11"
             />
             <Button
@@ -285,18 +317,18 @@ export function CreateShare() {
           ) : (
             <p id="ss-password-help" className="text-xs text-muted-foreground">
               {password
-                ? "The recipient needs this password. LifeKit can't recover it."
-                : "Leave empty and LifeKit generates a random share key instead."}
+                ? "The recipient will be prompted for this password before decryption."
+                : "Leave empty to embed the zero-knowledge decryption key in the link URL hash for seamless 1-click opening."}
             </p>
           )}
         </div>
 
         <div className="flex items-start justify-between gap-3">
-          <Label htmlFor="ss-download" className="font-normal">
+          <Label htmlFor="ss-download" className="font-normal cursor-pointer">
             <span>
-              Allow download
+              Allow file download
               <span className="block text-xs text-muted-foreground">
-                When off, the recipient&apos;s app shows a preview only. This can&apos;t stop someone from saving what they can see.
+                When off, recipients can only preview files inline (saving raw files is disabled).
               </span>
             </span>
           </Label>
@@ -304,12 +336,13 @@ export function CreateShare() {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="ss-notes">Note to recipient (optional, encrypted)</Label>
+          <Label htmlFor="ss-notes">Note to recipient (encrypted)</Label>
           <Textarea
             id="ss-notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             maxLength={2000}
+            placeholder="Add an optional message that is encrypted together with the files..."
             aria-invalid={!!errors.notes}
             className="min-h-20"
           />
@@ -317,7 +350,7 @@ export function CreateShare() {
         </div>
 
         {failure ? (
-          <Notice tone="danger" title="Couldn't create the package">
+          <Notice tone="danger" title="Couldn't create the share link">
             {failure}
           </Notice>
         ) : null}
@@ -325,7 +358,7 @@ export function CreateShare() {
         <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] -mx-1 bg-card px-1 pt-1 lg:static">
           <Button size="lg" className="w-full" onClick={create} disabled={!files.length || tooLarge || busy}>
             {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Lock aria-hidden />}
-            {busy ? STAGE_LABEL[stage!] : "Create secure package"}
+            {busy ? STAGE_LABEL[stage!] : isPublicLink ? "Generate secure share link" : "Create offline package"}
           </Button>
           <p className="mt-2 text-center text-xs text-muted-foreground" aria-live="polite">
             {files.length
@@ -340,10 +373,38 @@ export function CreateShare() {
 
 function ShareResultView({ result, onReset }: { result: ShareResult; onReset: () => void }) {
   const pkg = result.package
-  const canShare = services.file.canShareFiles([pkg])
+  const canShareFiles = services.file.canShareFiles([pkg])
   const expires = new Date(result.expiresAt)
+  const [showQr, setShowQr] = useState(false)
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null)
 
-  const share = async () => {
+  useEffect(() => {
+    if (!showQr || !qrCanvasRef.current || !result.publicUrl) return
+    renderQrCanvas(
+      result.publicUrl,
+      { fg: "#000000", bg: "#ffffff", size: 240, margin: 2, ecc: "M", logoRatio: 0 },
+      qrCanvasRef.current
+    ).catch(console.error)
+  }, [showQr, result.publicUrl])
+
+  const shareViaWebShare = async () => {
+    if (result.publicUrl && typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: "Secure files shared via LifeKit",
+          text:
+            result.protection === "password"
+              ? "Here are encrypted files. You will need the password I sent you to decrypt them:"
+              : "Here are secure files shared with you. Click to open and decrypt instantly in your browser:",
+          url: result.publicUrl,
+        })
+        return
+      } catch {
+        // Handled or cancelled
+      }
+    }
+
+    // Fallback to sharing the package file
     const ok = await services.file.share({
       files: [pkg],
       title: "Encrypted file",
@@ -352,47 +413,83 @@ function ShareResultView({ result, onReset }: { result: ShareResult; onReset: ()
           ? "Open this with LifeKit → SecureShare → Open a package. I'll send you the password separately."
           : "Open this with LifeKit → SecureShare → Open a package. I'll send you the share key separately.",
     })
-    if (!ok) toast.info("Sharing was cancelled or isn't available — you can download the package instead.")
+    if (!ok) toast.info("Sharing was cancelled or isn't available — you can copy the link or download the package.")
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-4">
-      <Notice tone="success" title="Your encrypted package is ready">
-        {result.fileCount} file{result.fileCount === 1 ? "" : "s"} encrypted in your browser. Send the package file to the recipient,
-        and send the {result.protection === "password" ? "password" : "share key"} through a different channel.
+      <Notice tone="success" title="Your files are encrypted and ready to share!">
+        {result.fileCount} file{result.fileCount === 1 ? "" : "s"} encrypted in your browser using AES-256-GCM.
+        {result.publicUrl
+          ? " Anyone with the public link can open and view/download the files."
+          : " You can download the encrypted package file to send via chat or email."}
       </Notice>
 
-      <section className="space-y-4 rounded-2xl border bg-card p-4 shadow-soft sm:p-5">
-        <div className="flex items-center gap-3">
-          <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <Lock className="size-6" aria-hidden />
+      {/* Public Link Card (Primary when available) */}
+      {result.publicUrl ? (
+        <section className="space-y-4 rounded-2xl border-2 border-primary/30 bg-card p-4 shadow-soft sm:p-5">
+          <div className="flex items-center gap-3">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <Globe className="size-6" aria-hidden />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base font-semibold text-foreground">Public Share Link (Zero-Knowledge)</h2>
+              <p className="text-xs text-muted-foreground">
+                Expires {format(expires, "PPp")} · Downloads {result.allowDownload ? "enabled" : "preview only"}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="truncate font-medium">{pkg.name}</p>
-            <p className="text-sm text-muted-foreground">
-              {formatBytes(pkg.size)} · expires {format(expires, "PPp")} · downloads {result.allowDownload ? "allowed" : "off"}
+
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Input
+                readOnly
+                value={result.publicUrl}
+                aria-label="Public Share URL"
+                className="font-mono text-xs selection:bg-primary/20"
+                onFocus={(e) => e.currentTarget.select()}
+              />
+              <CopyButton value={result.publicUrl} label="Copy Link" />
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button size="default" onClick={shareViaWebShare} className="flex-1 min-w-[140px]">
+                <Share2 aria-hidden /> Share Link
+              </Button>
+              <Button
+                variant="outline"
+                size="default"
+                onClick={() => setShowQr((v) => !v)}
+                aria-pressed={showQr}
+              >
+                <QrCode aria-hidden /> {showQr ? "Hide QR" : "Show QR Code"}
+              </Button>
+            </div>
+          </div>
+
+          {showQr ? (
+            <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-white border border-border mt-3">
+              <canvas ref={qrCanvasRef} className="size-[200px]" />
+              <p className="text-xs text-neutral-600 mt-2 font-sans text-center">
+                Scan with mobile camera to open and decrypt files directly
+              </p>
+            </div>
+          ) : null}
+
+          <div className="rounded-xl bg-surface-muted/60 p-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-medium text-foreground">🔒 Zero-Knowledge Security:</p>
+            <p>
+              Your files were encrypted locally with AES-256 before leaving your computer.
+              {result.protection === "key"
+                ? " The decryption key is in the URL anchor (#key=...) which is never transmitted to the host server."
+                : " The recipient must enter the password to decrypt the files."}
             </p>
           </div>
-        </div>
+        </section>
+      ) : null}
 
-        <div className="grid gap-2 sm:grid-cols-2">
-          {canShare ? (
-            <Button size="lg" onClick={share}>
-              <Share2 aria-hidden /> Share package
-            </Button>
-          ) : null}
-          <Button size="lg" variant={canShare ? "outline" : "default"} onClick={() => downloadBlob(pkg, pkg.name)} className={cn(!canShare && "sm:col-span-2")}>
-            <Download aria-hidden /> Download package
-          </Button>
-        </div>
-        {!canShare ? (
-          <p className="text-xs text-muted-foreground">
-            This device can&apos;t share this file type directly. Download it, then attach it in your email or messaging app.
-          </p>
-        ) : null}
-      </section>
-
-      {result.shareKey ? (
+      {/* Share Key Card if password was not set and no public link */}
+      {result.shareKey && !result.publicUrl ? (
         <section className="space-y-3 rounded-2xl border border-warning/40 bg-card p-4 shadow-soft sm:p-5">
           <h2 className="flex items-center gap-2 font-medium">
             <KeyRound className="size-4" aria-hidden /> Share key
@@ -400,33 +497,39 @@ function ShareResultView({ result, onReset }: { result: ShareResult; onReset: ()
           <code className="block rounded-lg bg-surface px-3 py-2.5 font-mono text-sm break-all select-all">{result.shareKey}</code>
           <CopyButton value={result.shareKey} label="Copy key" className="w-full sm:w-auto" />
           <p className="text-xs text-muted-foreground">
-            Anyone with the package <strong>and</strong> this key can open it. Send it separately from the file (e.g. a different app).
-            It isn&apos;t saved anywhere — copy it now; it can&apos;t be recovered.
+            Anyone with the package <strong>and</strong> this key can open it. Send it separately from the file.
           </p>
         </section>
-      ) : (
-        <Notice tone="info" icon={KeyRound}>
-          Protected with your password. Tell the recipient the password separately — not in the same message as the file.
-        </Notice>
-      )}
+      ) : null}
 
-      <section className="space-y-2 rounded-2xl border bg-card p-4 shadow-soft sm:p-5">
-        <h2 className="flex items-center gap-2 font-medium">
-          <Link2 className="size-4" aria-hidden /> Local link — works only in this browser tab, not on other devices
-        </h2>
-        <div className="flex gap-2">
-          <Input readOnly value={result.localUrl} aria-label="Local link to the encrypted package" className="font-mono text-xs" onFocus={(e) => e.currentTarget.select()} />
-          <CopyButton value={result.localUrl} iconOnly label="Copy local link" />
+      {result.protection === "password" ? (
+        <Notice tone="info" icon={KeyRound}>
+          Password protected. Remember to share the password with your recipient through a separate message or channel.
+        </Notice>
+      ) : null}
+
+      {/* Offline Package File Card */}
+      <section className="space-y-3 rounded-2xl border bg-card p-4 shadow-soft sm:p-5">
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-muted-foreground">
+            <Lock className="size-5" aria-hidden />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-medium text-sm">{pkg.name}</p>
+            <p className="text-xs text-muted-foreground">
+              {formatBytes(pkg.size)} · Standalone offline encrypted container
+            </p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => downloadBlob(pkg, pkg.name)}>
+            <Download aria-hidden /> Download .lifekit
+          </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          This <code>blob:</code> link points to the encrypted package in this tab&apos;s memory and stops working when you close or reload
-          it. It is not a public link and can&apos;t be opened by anyone else.
-        </p>
       </section>
 
       <Button variant="outline" size="lg" className="w-full" onClick={onReset}>
-        <RotateCcw aria-hidden /> Protect other files
+        <RotateCcw aria-hidden /> Protect & share other files
       </Button>
     </div>
   )
 }
+

@@ -11,8 +11,8 @@ export default function NotFound() {
       <h1 className="mt-4 text-2xl font-semibold tracking-tight">Page not found</h1>
       <p className="mt-1 text-muted-foreground">That tool or page doesn&apos;t exist in LifeKit.</p>
       <div className="mt-6 flex gap-2">
-        <Button render={<Link href="/" />}>Go home</Button>
-        <Button variant="outline" render={<Link href="/tools" />}>
+        <Button nativeButton={false} render={<Link href="/" />}>Go home</Button>
+        <Button variant="outline" nativeButton={false} render={<Link href="/tools" />}>
           Browse tools
         </Button>
       </div>

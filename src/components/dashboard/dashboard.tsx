@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useState } from "react"
 import { format } from "date-fns"
 import { motion } from "framer-motion"
-import { ChevronRight, FileText, Images, LayoutGrid, ListTodo, Calculator, Scan, SlidersHorizontal, Sparkles, UserRound } from "lucide-react"
+import { ChevronRight, FileText, GraduationCap, Images, LayoutGrid, ListTodo, Calculator, PenLine, Scan, SlidersHorizontal, Sparkles, UserRound } from "lucide-react"
 import { ToolCard } from "@/components/cards/tool-card"
 import { ResponsiveSheet } from "@/components/common/responsive-sheet"
 import { Button } from "@/components/ui/button"
@@ -34,6 +34,8 @@ const UTILITY_GROUPS = [
   { title: "Calculators", description: "EMI, GST, percentage", href: "/tools#finance", icon: Calculator, accent: "bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/15 dark:text-emerald-300" },
   { title: "Productivity", description: "Tasks, routine, calendar", href: "/my-life#productivity", icon: ListTodo, accent: "bg-orange-500/10 text-orange-600 dark:bg-orange-400/15 dark:text-orange-300" },
   { title: "Personal", description: "Wellness, bookmarks, info", href: "/my-life#personal", icon: UserRound, accent: "bg-teal-500/10 text-teal-600 dark:bg-teal-400/15 dark:text-teal-300" },
+  { title: "AI Productivity", description: "Write, summarize, plan", href: "/tools#ai", icon: PenLine, accent: "bg-violet-500/10 text-violet-600 dark:bg-violet-400/15 dark:text-violet-300" },
+  { title: "Learn Skills", description: "Prompting, English, logic", href: "/learn", icon: GraduationCap, accent: "bg-amber-500/10 text-amber-600 dark:bg-amber-400/15 dark:text-amber-300" },
 ]
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } }
@@ -120,7 +122,7 @@ export function Dashboard() {
             initial="hidden"
             whileInView="show"
             viewport={{ once: true, margin: "-40px" }}
-            className="grid grid-cols-2 gap-3 lg:grid-cols-3"
+            className="grid grid-cols-2 gap-3 lg:grid-cols-4"
           >
             {UTILITY_GROUPS.map(({ title, description, href, icon: Icon, accent }) => (
               <motion.li key={title} variants={item}>
@@ -149,7 +151,7 @@ export function Dashboard() {
           <p className="mt-1 text-sm text-muted-foreground">Turn sections back on, or browse all tools.</p>
           <div className="mt-4 flex justify-center gap-2">
             <Button onClick={() => setCustomizing(true)}>Customize</Button>
-            <Button variant="outline" render={<Link href="/tools" />}>
+            <Button variant="outline" nativeButton={false} render={<Link href="/tools" />}>
               <LayoutGrid /> Tools
             </Button>
           </div>

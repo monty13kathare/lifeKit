@@ -59,14 +59,14 @@ export function notificationSupport(): "unsupported" | NotificationPermission {
   return Notification.permission
 }
 
-export async function showReminderNotification(title: string, body?: string) {
+export async function showReminderNotification(title: string, body?: string, url = "/tools/reminders") {
   if (notificationSupport() !== "granted") return false
   const options: NotificationOptions = {
     body,
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-192.png",
     tag: `lifekit-${title}`,
-    data: { url: "/tools/reminders" },
+    data: { url },
   }
   try {
     const reg = await navigator.serviceWorker?.getRegistration()

@@ -3,7 +3,7 @@
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Trash2 } from "lucide-react"
+import { Copy, Trash2, TriangleAlert } from "lucide-react"
 import { ResponsiveSheet } from "@/components/common/responsive-sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +11,7 @@ import { EVENT_COLOR_KEYS, EVENT_COLORS } from "@/components/tools/calendar/even
 import { FormField, SwatchPicker } from "@/components/tools/calendar/form-field"
 import { cn } from "@/lib/utils"
 import type { EventColor, RoutineItem } from "@/types"
-import { DAY_LETTERS, DAY_NAMES, DAY_PRESETS, formatDuration } from "./routine-utils"
+import { DAY_LETTERS, DAY_NAMES, DAY_PRESETS, findOverlaps, formatClock, formatDuration, toMinutes } from "./routine-utils"
 
 const schema = z.object({
   title: z.string().trim().min(1, "Give this block a name").max(80, "Keep it under 80 characters"),
@@ -38,10 +38,14 @@ interface RoutineFormSheetProps {
   defaults?: Partial<RoutineDraft>
   onSubmit: (draft: RoutineDraft) => void
   onDelete?: (item: RoutineItem) => void
+  /** Offer "Duplicate" when editing an existing block. */
+  onDuplicate?: (item: RoutineItem) => void
+  /** All routine items, for the overlap warning (the edited item is ignored). */
+  allItems?: RoutineItem[]
 }
 
 export function RoutineFormSheet(props: RoutineFormSheetProps) {
-  const { open, onOpenChange, item, onDelete } = props
+  const { open, onOpenChange, item, onDelete, onDuplicate } = props
   return (
     <ResponsiveSheet
       open={open}
@@ -52,6 +56,11 @@ export function RoutineFormSheet(props: RoutineFormSheetProps) {
           {item && onDelete ? (
             <Button type="button" variant="destructive" size="lg" className="sm:h-10" onClick={() => onDelete(item)}>
               <Trash2 aria-hidden /> <span className="sr-only sm:not-sr-only">Delete</span>
+            </Button>
+          ) : null}
+          {item && onDuplicate ? (
+            <Button type="button" variant="outline" size="lg" className="sm:h-10" onClick={() => onDuplicate(item)}>
+              <Copy aria-hidden /> <span className="sr-only sm:not-sr-only">Duplicate</span>
             </Button>
           ) : null}
           <div className="flex flex-1 justify-end gap-2">
@@ -70,7 +79,7 @@ export function RoutineFormSheet(props: RoutineFormSheetProps) {
   )
 }
 
-function RoutineForm({ item, defaults, onSubmit }: RoutineFormSheetProps) {
+function RoutineForm({ item, defaults, onSubmit, allItems = [] }: RoutineFormSheetProps) {
   const init = item ?? defaults
   const {
     register,
@@ -90,6 +99,11 @@ function RoutineForm({ item, defaults, onSubmit }: RoutineFormSheetProps) {
   })
   const duration = useWatch({ control, name: "durationMinutes" })
   const repeatDays = useWatch({ control, name: "repeatDays" })
+  const time = useWatch({ control, name: "time" })
+  const overlaps = findOverlaps(
+    { time, durationMinutes: duration, repeatDays },
+    allItems.filter((o) => o.id !== item?.id)
+  )
 
   return (
     <form id={FORM_ID} noValidate className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
@@ -126,6 +140,20 @@ function RoutineForm({ item, defaults, onSubmit }: RoutineFormSheetProps) {
           </button>
         ))}
       </div>
+
+      {overlaps.length ? (
+        <p role="status" className="-mt-1 flex gap-2 rounded-xl border border-warning/35 bg-warning/10 p-3 text-xs">
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning-foreground dark:text-warning" aria-hidden />
+          <span>
+            Overlaps with{" "}
+            {overlaps
+              .slice(0, 3)
+              .map((o) => `${o.title} (${formatClock(toMinutes(o.time))}–${formatClock(toMinutes(o.time) + o.durationMinutes)})`)
+              .join(", ")}
+            {overlaps.length > 3 ? ` and ${overlaps.length - 3} more` : ""} on a shared day. You can still save it.
+          </span>
+        </p>
+      ) : null}
 
       <fieldset aria-describedby={errors.repeatDays ? "repeat-error" : undefined}>
         <legend className="mb-1.5 text-sm font-medium">Repeat on</legend>

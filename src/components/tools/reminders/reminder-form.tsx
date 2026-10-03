@@ -1,10 +1,10 @@
 "use client"
 
 import { addHours, format, startOfHour } from "date-fns"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Trash2 } from "lucide-react"
+import { Repeat, Trash2, Zap } from "lucide-react"
 import { ResponsiveSheet } from "@/components/common/responsive-sheet"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { FormField } from "@/components/tools/calendar/form-field"
 import { combineDateTime, toDateString } from "@/lib/dates"
 import type { Reminder } from "@/types"
+import { describeRepeat, TIME_PRESETS } from "./reminder-utils"
 
 const schema = z.object({
   title: z.string().trim().min(1, "What should we remind you about?").max(120, "Keep it under 120 characters"),
@@ -38,6 +39,8 @@ interface ReminderFormSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   reminder?: Reminder
+  /** Prefill for a new reminder (e.g. from the natural-language bar). */
+  defaults?: ReminderDraft
   onSubmit: (draft: ReminderDraft) => void
   onDelete?: (r: Reminder) => void
 }
@@ -72,22 +75,36 @@ export function ReminderFormSheet(props: ReminderFormSheetProps) {
   )
 }
 
-function ReminderForm({ reminder, onSubmit }: ReminderFormSheetProps) {
+function ReminderForm({ reminder, defaults, onSubmit }: ReminderFormSheetProps) {
+  const init = reminder ?? defaults
   const {
     register,
     control,
     handleSubmit,
     setError,
+    setValue,
+    clearErrors,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: reminder
-      ? { title: reminder.title, date: reminder.date, time: reminder.time, repeat: reminder.repeat, notes: reminder.notes ?? "" }
+    defaultValues: init
+      ? { title: init.title, date: init.date, time: init.time, repeat: init.repeat, notes: init.notes ?? "" }
       : (() => {
           const next = addHours(startOfHour(new Date()), 1)
           return { title: "", date: toDateString(next), time: format(next, "HH:mm"), repeat: "none" as const, notes: "" }
         })(),
   })
+
+  const [watchDate, watchTime, watchRepeat] = useWatch({ control, name: ["date", "time", "repeat"] })
+  const repeatText =
+    watchDate && /^\d{2}:\d{2}$/.test(watchTime) ? describeRepeat({ date: watchDate, time: watchTime, repeat: watchRepeat }) : null
+
+  const applyPreset = (compute: (now: Date) => Date) => {
+    const d = compute(new Date())
+    setValue("date", toDateString(d), { shouldDirty: true })
+    setValue("time", format(d, "HH:mm"), { shouldDirty: true })
+    clearErrors(["date", "time"])
+  }
 
   return (
     <form
@@ -114,6 +131,18 @@ function ReminderForm({ reminder, onSubmit }: ReminderFormSheetProps) {
           {(p) => <Input {...p} type="time" {...register("time")} className="h-11" />}
         </FormField>
       </div>
+      <div className="-mt-1 flex flex-wrap gap-1.5" role="group" aria-label="Quick times">
+        {TIME_PRESETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => applyPreset(p.compute)}
+            className="inline-flex h-9 items-center gap-1 rounded-full border bg-card px-3 text-xs font-medium transition-colors outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <Zap className="size-3 text-primary" aria-hidden /> {p.label}
+          </button>
+        ))}
+      </div>
       <FormField label="Repeat" hint="Repeating reminders start from the date above.">
         {(p) => (
           <Controller
@@ -136,6 +165,11 @@ function ReminderForm({ reminder, onSubmit }: ReminderFormSheetProps) {
           />
         )}
       </FormField>
+      {repeatText ? (
+        <p className="-mt-2 flex items-center gap-1.5 text-xs text-muted-foreground" aria-live="polite">
+          <Repeat className="size-3.5" aria-hidden /> {repeatText}
+        </p>
+      ) : null}
       <FormField label="Notes" error={errors.notes?.message}>
         {(p) => <Textarea {...p} {...register("notes")} rows={3} placeholder="Optional — shown in the notification" />}
       </FormField>

@@ -28,6 +28,8 @@ export interface Task {
   completedAt?: ISODateTime
   subtasks: Subtask[]
   createdAt: ISODateTime
+  /** Total minutes spent on this task in completed Focus sessions. */
+  focusMinutes?: number
   demo?: boolean
 }
 
@@ -64,6 +66,10 @@ export interface CalendarEvent {
   recurrence: Recurrence
   /** Last date (inclusive) a recurring event repeats on. */
   recurrenceUntil?: DateString
+  /** Alert this many minutes before each occurrence (null/undefined = no alert). */
+  alertMinutes?: number | null
+  /** ISO start of the occurrence most recently alerted, to avoid duplicates. */
+  lastAlertedFor?: ISODateTime
   demo?: boolean
 }
 
@@ -102,6 +108,57 @@ export interface Note {
   source: "manual" | "ocr" | "voice"
   createdAt: ISODateTime
   updatedAt: ISODateTime
+  /** Pinned notes are listed first. */
+  pinned?: boolean
+  color?: EventColor
+  tags?: string[]
+  demo?: boolean
+}
+
+/* ------------------------------------------------------------------ Focus */
+
+export type FocusPhase = "focus" | "short-break" | "long-break"
+
+export interface FocusSettings {
+  focusMinutes: number
+  shortBreakMinutes: number
+  longBreakMinutes: number
+  /** Focus sessions before a long break. */
+  sessionsBeforeLongBreak: number
+  autoStartBreaks: boolean
+  autoStartFocus: boolean
+  /** Daily goal in focus minutes. */
+  dailyGoalMinutes: number
+  sound: boolean
+}
+
+/** Live timer state; persisted so the timer survives navigation and reloads. */
+export interface FocusTimerState {
+  phase: FocusPhase
+  status: "idle" | "running" | "paused"
+  /** When running: epoch ms the phase ends. */
+  endsAt?: number
+  /** When paused: ms left. */
+  remainingMs?: number
+  /** Planned length of the current phase in ms. */
+  durationMs: number
+  /** Focus sessions completed in the current cycle (resets after a long break). */
+  cycleCount: number
+  taskId?: string
+  label?: string
+}
+
+export interface FocusSession {
+  id: string
+  phase: FocusPhase
+  taskId?: string
+  label?: string
+  startedAt: ISODateTime
+  endedAt: ISODateTime
+  /** Actual minutes, rounded. */
+  minutes: number
+  /** False when stopped early. */
+  completed: boolean
   demo?: boolean
 }
 
@@ -206,6 +263,8 @@ export interface DashboardPrefs {
   }
 }
 
+export type AiLanguage = "en" | "hi"
+
 export interface Settings {
   displayName: string
   dashboard: DashboardPrefs
@@ -213,4 +272,110 @@ export interface Settings {
   /** Has demo data been seeded (or deliberately skipped) in this browser? */
   seeded: boolean
   currency: string
+  /** Language for AI-generated content. */
+  aiLanguage: AiLanguage
+}
+
+/* ------------------------------------------------------------------ Goals */
+
+export interface GoalMilestone {
+  id: string
+  title: string
+  targetDate?: DateString
+  /** Tasks created in the Tasks tool for this milestone. */
+  taskIds: string[]
+  done: boolean
+}
+
+export interface Goal {
+  id: string
+  title: string
+  why?: string
+  deadline?: DateString
+  milestones: GoalMilestone[]
+  status: "active" | "achieved" | "archived"
+  createdAt: ISODateTime
+  achievedAt?: ISODateTime
+  demo?: boolean
+}
+
+/* -------------------------------------------------------------- Decisions */
+
+export interface DecisionCriterion {
+  id: string
+  name: string
+  /** 1 (minor) … 5 (critical) */
+  weight: number
+}
+
+export interface Decision {
+  id: string
+  question: string
+  options: { id: string; name: string }[]
+  criteria: DecisionCriterion[]
+  /** optionId -> criterionId -> score 1…5 */
+  scores: Record<string, Record<string, number>>
+  /** Option the user finally chose, if any. */
+  chosenOptionId?: string
+  notes?: string
+  createdAt: ISODateTime
+  updatedAt: ISODateTime
+  demo?: boolean
+}
+
+/* --------------------------------------------------------- Health profile */
+
+export type ActivityLevel = "sedentary" | "light" | "moderate" | "active" | "very-active"
+export type HealthGoal = "lose-weight" | "maintain" | "gain-weight" | "build-fitness" | "more-energy" | "better-sleep"
+export type DietType = "vegetarian" | "non-vegetarian" | "eggetarian" | "vegan" | "jain"
+export type WorkType = "desk" | "standing" | "physical" | "student" | "home" | "shift"
+
+export interface WeightEntry {
+  date: DateString
+  kg: number
+}
+
+export interface HealthProfile {
+  age?: number
+  sex?: "male" | "female" | "other"
+  heightCm?: number
+  /** Current weight; also appended to `weightLog` when it changes. */
+  weightKg?: number
+  activity: ActivityLevel
+  goal: HealthGoal
+  /** Target weight for lose/gain goals. */
+  targetWeightKg?: number
+  diet?: DietType
+  work?: WorkType
+  wakeTime?: TimeString
+  bedTime?: TimeString
+  /** Optional free text the user chooses to share (e.g. "mild back pain", "desk job, long commute"). */
+  notes?: string
+  weightLog: WeightEntry[]
+  /** Preferred input units (values are always stored in cm and kg). */
+  heightUnit?: "cm" | "ft"
+  weightUnit?: "kg" | "lb"
+  updatedAt?: ISODateTime
+}
+
+/** A saved AI health check (latest few kept). */
+export interface HealthInsight {
+  id: string
+  generatedAt: ISODateTime
+  language: AiLanguage
+  /** Snapshot of the inputs' key numbers, to show "then vs now". */
+  snapshot: { weightKg?: number; bmi?: number; avgSleep?: number; avgSteps?: number; avgWater?: number }
+  /** Output of the `health-insights` AI job. */
+  data: {
+    summary: string
+    score: number
+    highlights: string[]
+    improvements: { area: string; observation: string; recommendation: string }[]
+    suggestedGoals: { waterGlasses?: number; steps?: number; exerciseMinutes?: number; sleepHours?: number }
+    mealIdeas: string[]
+    exerciseIdeas: string[]
+    sleepTips: string[]
+    seeDoctor: string[]
+  }
+  demo?: boolean
 }

@@ -2,6 +2,7 @@ import Link from "next/link"
 import { Logo } from "@/components/common/logo"
 import { ProfileMenu } from "./profile-menu"
 import { ThemeToggle } from "./theme-toggle"
+import { FocusPill } from "@/components/focus/focus-pill"
 
 export function Header() {
   return (
@@ -11,6 +12,7 @@ export function Header() {
           <Logo />
         </Link>
         <div className="flex-1" />
+        <FocusPill />
         <ThemeToggle />
         <ProfileMenu />
       </div>

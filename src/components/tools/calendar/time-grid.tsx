@@ -2,10 +2,13 @@
 
 import { useEffect, useRef } from "react"
 import { format, isSameDay, setHours, setMinutes, startOfDay } from "date-fns"
+import { Bell } from "lucide-react"
+import { toDateString } from "@/lib/dates"
 import { cn } from "@/lib/utils"
-import type { EventOccurrence } from "@/types"
-import { layoutDay, occurrencesOn, occurrenceTimeLabel } from "./calendar-utils"
+import type { EventOccurrence, Task } from "@/types"
+import { alertLabel, hasAlert, layoutDay, occurrencesOn, occurrenceTimeLabel } from "./calendar-utils"
 import { colorClasses } from "./event-colors"
+import { TaskChip } from "./task-items"
 
 const HOUR = 48 // px per hour
 const HOURS = Array.from({ length: 24 }, (_, h) => h)
@@ -18,9 +21,13 @@ interface TimeGridProps {
   onEventClick: (o: EventOccurrence) => void
   /** Clicking a day header (week view) — e.g. open that day. */
   onDayClick?: (day: Date) => void
+  /** Incomplete tasks keyed by due date, shown in the all-day row (omit to hide). */
+  tasksByDay?: Map<string, Task[]>
+  /** Event id to emphasise briefly. */
+  highlightId?: string | null
 }
 
-export function TimeGrid({ days, occurrences, now, onSlotClick, onEventClick, onDayClick }: TimeGridProps) {
+export function TimeGrid({ days, occurrences, now, onSlotClick, onEventClick, onDayClick, tasksByDay, highlightId }: TimeGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const multi = days.length > 1
   const showsToday = days.some((d) => isSameDay(d, now))
@@ -38,7 +45,8 @@ export function TimeGrid({ days, occurrences, now, onSlotClick, onEventClick, on
 
   const cols = `3rem repeat(${days.length}, minmax(0, 1fr))`
   const allDayByDay = days.map((d) => occurrencesOn(occurrences, d).filter((o) => o.event.allDay))
-  const hasAllDay = allDayByDay.some((l) => l.length)
+  const tasksPerDay = days.map((d) => tasksByDay?.get(toDateString(d)) ?? [])
+  const hasAllDay = allDayByDay.some((l) => l.length) || tasksPerDay.some((l) => l.length)
   const nowTop = (now.getHours() * 60 + now.getMinutes()) * (HOUR / 60)
 
   return (
@@ -95,12 +103,21 @@ export function TimeGrid({ days, occurrences, now, onSlotClick, onEventClick, on
                         key={o.key}
                         type="button"
                         onClick={() => onEventClick(o)}
-                        className={cn("block w-full truncate rounded-md px-1.5 py-0.5 text-left text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring", c.soft, c.softHover)}
+                        className={cn(
+                          "flex w-full min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-left text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          c.soft,
+                          c.softHover,
+                          highlightId === o.event.id && "ring-2 ring-primary"
+                        )}
                       >
-                        {o.event.title}
+                        <span className="truncate">{o.event.title}</span>
+                        {hasAlert(o.event.alertMinutes) ? <Bell className="ml-auto size-3 shrink-0 opacity-70" aria-hidden /> : null}
                       </button>
                     )
                   })}
+                  {tasksPerDay[i].map((t) => (
+                    <TaskChip key={t.id} task={t} />
+                  ))}
                 </div>
               ))}
             </div>
@@ -151,13 +168,14 @@ export function TimeGrid({ days, occurrences, now, onSlotClick, onEventClick, on
                             e.stopPropagation()
                             onEventClick(p.occurrence)
                           }}
-                          aria-label={`${p.occurrence.event.title}, ${occurrenceTimeLabel(p.occurrence)}`}
+                          aria-label={`${p.occurrence.event.title}, ${occurrenceTimeLabel(p.occurrence)}${hasAlert(p.occurrence.event.alertMinutes) ? `, alert ${alertLabel(p.occurrence.event.alertMinutes)}` : ""}`}
                           className={cn(
                             "absolute overflow-hidden rounded-md border-l-[3px] px-1.5 text-left text-xs leading-tight shadow-sm outline-none focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-ring",
                             c.soft,
                             c.softHover,
                             c.border,
-                            short ? "flex items-center gap-1 py-0" : "py-1"
+                            short ? "flex items-center gap-1 py-0" : "py-1",
+                            highlightId === p.occurrence.event.id && "z-10 ring-2 ring-primary"
                           )}
                           style={{
                             top,
@@ -166,7 +184,12 @@ export function TimeGrid({ days, occurrences, now, onSlotClick, onEventClick, on
                             width: `calc(${100 / p.cols}% - 4px)`,
                           }}
                         >
-                          <span className="block truncate font-semibold">{p.occurrence.event.title}</span>
+                          {!short && hasAlert(p.occurrence.event.alertMinutes) && p.cols < 3 ? (
+                            <Bell className="absolute top-1 right-1 size-3 opacity-70" aria-hidden />
+                          ) : null}
+                          <span className={cn("block truncate font-semibold", !short && hasAlert(p.occurrence.event.alertMinutes) && p.cols < 3 && "pr-3.5")}>
+                            {p.occurrence.event.title}
+                          </span>
                           <span className={cn("truncate opacity-80", short ? "hidden sm:inline" : "block")}>
                             {format(p.occurrence.start, "h:mm a")}
                           </span>

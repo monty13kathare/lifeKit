@@ -73,7 +73,26 @@ export interface ImageAnnotation {
   src: string
 }
 
-export type Annotation = TextAnnotation | InkAnnotation | HighlightAnnotation | ImageAnnotation
+export interface TextReplaceAnnotation {
+  id: string
+  type: "text-replace"
+  /** Normalised 0-1 page space coordinates of the cover rectangle */
+  x: number
+  y: number
+  w: number
+  h: number
+  baselineY?: number
+  text: string
+  originalText?: string
+  fontSize: number
+  color: string
+  bgColor: string
+  fontFamily: "sans" | "serif" | "mono"
+  fontWeight: "normal" | "bold"
+  rotation: Rotation
+}
+
+export type Annotation = TextAnnotation | InkAnnotation | HighlightAnnotation | ImageAnnotation | TextReplaceAnnotation
 export type AnnotationMap = Record<string, Annotation[]>
 
 export interface WatermarkSettings {
@@ -304,6 +323,11 @@ export async function exportEditedPdf({
   }
 
   const font = await out.embedFont(StandardFonts.Helvetica)
+  const fontBold = await out.embedFont(StandardFonts.HelveticaBold)
+  const times = await out.embedFont(StandardFonts.TimesRoman)
+  const timesBold = await out.embedFont(StandardFonts.TimesRomanBold)
+  const courier = await out.embedFont(StandardFonts.Courier)
+  const courierBold = await out.embedFont(StandardFonts.CourierBold)
   let replaced = false
   const encodable = new Map<string, boolean>()
   const sanitize = (text: string) =>
@@ -355,6 +379,64 @@ export async function exportEditedPdf({
 
     for (const a of annotations[meta.id] ?? []) {
       switch (a.type) {
+        case "text-replace": {
+          // 1. Draw solid background cover over the original text to erase it completely
+          // Tiny bleed ensures full coverage of anti-aliased edge pixels without overlapping nearby lines
+          const bleedX = 1
+          const bleedY = 1.2
+          page.drawRectangle({
+            x: crop.x + a.x * W - bleedX,
+            y: crop.y + H - (a.y + a.h) * H - bleedY,
+            width: a.w * W + bleedX * 2,
+            height: a.h * H + bleedY * 2,
+            color: color(a.bgColor || "#ffffff"),
+            opacity: 1,
+          })
+
+          if (!a.text || !a.text.trim()) break
+
+          // 2. Select matching vector font based on family and weight
+          const chosenFont =
+            a.fontFamily === "serif"
+              ? a.fontWeight === "bold"
+                ? timesBold
+                : times
+              : a.fontFamily === "mono"
+                ? a.fontWeight === "bold"
+                  ? courierBold
+                  : courier
+                : a.fontWeight === "bold"
+                  ? fontBold
+                  : font
+
+          // 3. Draw replacement text in the exact position
+          const rad = (a.rotation * Math.PI) / 180
+          const down = { x: -Math.sin(rad), y: -Math.cos(rad) }
+          const anchor = toPdf(a.x, a.y)
+          const baselinePdfY = a.baselineY !== undefined ? crop.y + H - a.baselineY * H : null
+
+          a.text
+            .split(/\r?\n/)
+            .map(sanitize)
+            .forEach((line, li) => {
+              if (!line.trim()) return
+              const textY =
+                baselinePdfY !== null
+                  ? baselinePdfY + down.y * (li * a.fontSize * TEXT_LINE_HEIGHT)
+                  : anchor.y + down.y * a.fontSize * (TEXT_BASELINE + li * TEXT_LINE_HEIGHT)
+              const textX = anchor.x + down.x * (li * a.fontSize * TEXT_LINE_HEIGHT)
+
+              page.drawText(line, {
+                x: textX,
+                y: textY,
+                size: a.fontSize,
+                font: chosenFont,
+                color: color(a.color),
+                rotate: degrees(-a.rotation),
+              })
+            })
+          break
+        }
         case "highlight": {
           page.drawRectangle({
             x: crop.x + a.x * W,

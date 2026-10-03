@@ -1,4 +1,4 @@
-export type Tool = "select" | "text" | "draw" | "highlight"
+export type Tool = "select" | "edit-text" | "text" | "draw" | "highlight"
 
 export interface ToolSettings {
   textColor: string
@@ -6,6 +6,8 @@ export interface ToolSettings {
   penColor: string
   penWidth: number
   highlightColor: string
+  fontFamily?: "sans" | "serif" | "mono"
+  fontWeight?: "normal" | "bold"
 }
 
 export const DEFAULT_TOOL_SETTINGS: ToolSettings = {

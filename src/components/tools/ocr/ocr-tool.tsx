@@ -17,7 +17,6 @@ import {
   RotateCcw,
   ScanText,
   Square,
-  Volume2,
   X,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -30,6 +29,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { AiTextActions } from "@/components/common/ai-text-actions"
 import { CopyButton } from "@/components/common/copy-button"
 import { EmptyState } from "@/components/common/empty-state"
 import { FileDropzone } from "@/components/common/file-dropzone"
@@ -224,13 +224,14 @@ export function OcrTool() {
     setSpeaking(true)
   }
 
-  const handOff = (path: string) => {
+  /** Hand the text to AI Writer's Translate mode via the URL (capped). */
+  const translate = () => {
     let t = text
     if (t.length > MAX_QUERY_TEXT) {
       t = t.slice(0, MAX_QUERY_TEXT)
       toast.info(`Only the first ${MAX_QUERY_TEXT.toLocaleString()} characters were sent.`)
     }
-    router.push(`${path}?text=${encodeURIComponent(t)}`)
+    router.push(`/tools/ai-writer?mode=translate&text=${encodeURIComponent(t)}`)
   }
 
   const save = () => {
@@ -437,6 +438,7 @@ export function OcrTool() {
             ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               <CopyButton value={text} />
+              <AiTextActions text={text} onReplace={setText} />
               <Button
                 variant={editing ? "secondary" : "outline"}
                 aria-pressed={editing}
@@ -450,7 +452,7 @@ export function OcrTool() {
               <Button variant="outline" disabled={!text.trim()} onClick={save}>
                 <NotebookPen aria-hidden /> Save to notes
               </Button>
-              <Button variant="outline" disabled={!text.trim()} onClick={() => handOff("/tools/translator")}>
+              <Button variant="outline" disabled={!text.trim()} onClick={translate}>
                 <Languages aria-hidden /> Translate
               </Button>
               {speechSupported ? (
@@ -458,9 +460,6 @@ export function OcrTool() {
                   {speaking ? <Square aria-hidden /> : <Play aria-hidden />} {speaking ? "Stop" : "Read aloud"}
                 </Button>
               ) : null}
-              <Button variant="outline" disabled={!text.trim()} onClick={() => handOff("/tools/text-to-voice")}>
-                <Volume2 aria-hidden /> Text to speech
-              </Button>
               <Button variant="outline" disabled={!text.trim()} onClick={() => downloadText(text, "extracted-text.txt")}>
                 <Download aria-hidden /> TXT
               </Button>

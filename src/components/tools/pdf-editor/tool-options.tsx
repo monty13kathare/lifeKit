@@ -88,6 +88,7 @@ function FontSizeSelect({ value, onChange }: { value: number; onChange: (n: numb
 
 const TYPE_LABEL: Record<Annotation["type"], string> = {
   text: "Text",
+  "text-replace": "Replaced text",
   ink: "Drawing",
   highlight: "Highlight",
   image: "Signature",
@@ -122,7 +123,7 @@ export function ToolOptions({
     return (
       <div className={cn(compact ? "flex items-center gap-2 overflow-x-auto" : "space-y-4")}>
         {!compact && <p className="text-sm font-medium">Selected: {TYPE_LABEL[selected.type]}</p>}
-        {selected.type === "text" && (
+        {(selected.type === "text" || selected.type === "text-replace") && (
           <>
             <div className={row}>
               <span className={labelCls}>Colour</span>
@@ -165,7 +166,7 @@ export function ToolOptions({
           <p className="text-xs text-muted-foreground">Drag to move. Drag the corner handle to resize.</p>
         )}
         <div className={cn("flex shrink-0 gap-2", !compact && "pt-1")}>
-          {selected.type === "text" && (
+          {(selected.type === "text" || selected.type === "text-replace") && (
             <Button variant="outline" size={compact ? "icon" : "default"} onClick={onEditSelected} aria-label="Edit text">
               <Pencil aria-hidden />
               {!compact && "Edit text"}
@@ -181,6 +182,23 @@ export function ToolOptions({
             {!compact && "Delete"}
           </Button>
         </div>
+      </div>
+    )
+  }
+
+  if (tool === "edit-text") {
+    return (
+      <div className={cn(compact ? "flex items-center gap-2 overflow-x-auto" : "space-y-3")}>
+        {!compact && (
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground space-y-1.5">
+            <p className="font-semibold text-foreground flex items-center gap-1.5">
+              <Pencil className="size-3.5 text-primary" /> Replace existing PDF text
+            </p>
+            <p>
+              Hover over and click any text inside the PDF to edit or replace it with auto-detected font, size, and color.
+            </p>
+          </div>
+        )}
       </div>
     )
   }

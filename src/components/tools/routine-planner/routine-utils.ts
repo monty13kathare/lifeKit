@@ -84,3 +84,19 @@ export function reorderPatch(visible: RoutineItem[], orderedIds: string[]): Map<
   })
   return patch
 }
+
+/** Other items that share a day with `draft` and whose time windows overlap it. */
+export function findOverlaps(
+  draft: { time: string; durationMinutes: number; repeatDays: number[] },
+  others: RoutineItem[]
+): RoutineItem[] {
+  if (!/^\d{2}:\d{2}$/.test(draft.time) || !Number.isFinite(draft.durationMinutes) || draft.durationMinutes <= 0) return []
+  const s = toMinutes(draft.time)
+  const e = s + draft.durationMinutes
+  return others.filter((o) => {
+    if (!o.repeatDays.some((d) => draft.repeatDays.includes(d))) return false
+    const os = toMinutes(o.time)
+    const oe = os + o.durationMinutes
+    return s < oe && os < e
+  })
+}

@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
-import { CalendarCheck2, CircleCheckBig, FilterX, ListTodo, Plus, Sparkles, Trash2 } from "lucide-react"
+import { CalendarCheck2, CalendarClock, CircleCheckBig, FilterX, ListTodo, Plus, Search, SearchX, Sparkles, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 import { EmptyState } from "@/components/common/empty-state"
 import { ToolPage } from "@/components/common/tool-page"
@@ -22,14 +23,20 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useNow } from "@/components/tools/calendar/use-now"
 import { useTasks } from "@/hooks/use-lifekit-data"
+import { useAiStatus } from "@/hooks/use-ai-status"
 import { useHydrated } from "@/hooks/use-store"
 import { toDateString } from "@/lib/dates"
+import { startFocus } from "@/lib/focus"
+import { createId } from "@/lib/storage/core"
 import { cn } from "@/lib/utils"
 import type { Subtask, Task, TaskPriority } from "@/types"
+import { SubtaskSuggestionsSheet, useSubtaskSuggestions } from "./ai-subtasks"
+import { QuickAdd } from "./quick-add"
 import { TaskCard } from "./task-card"
 import { TaskFormSheet, type TaskDraft } from "./task-form"
 import {
   formatShortDate,
+  matchesQuery,
   nextDueDate,
   PRESET_CATEGORIES,
   PRIORITY_META,
@@ -41,7 +48,7 @@ import {
 } from "./task-utils"
 
 type View = "today" | "upcoming" | "completed"
-type SheetState = { open: boolean; task?: Task; defaults?: Partial<TaskDraft> }
+type SheetState = { open: boolean; task?: Task; defaults?: Partial<TaskDraft>; fromQuick?: boolean }
 
 const UPCOMING_ORDER: UpcomingGroup[] = ["Tomorrow", "This week", "Later", "No date"]
 const PRIORITY_ITEMS = [
@@ -62,6 +69,12 @@ export function TodoApp() {
   const [sort, setSort] = useState<SortKey>("due")
   const [quick, setQuick] = useState("")
   const [confirmClear, setConfirmClear] = useState(false)
+  const [query, setQuery] = useState("")
+  const router = useRouter()
+  const ai = useAiStatus()
+  const aiConfigured = !!ai?.configured
+  const breakdown = useSubtaskSuggestions()
+  const [breakdownTask, setBreakdownTask] = useState<Task | null>(null)
 
   const openNew = (defaults?: Partial<TaskDraft>) => setSheet({ open: true, defaults })
   const openEdit = (task: Task) => setSheet({ open: true, task })
@@ -86,6 +99,7 @@ export function TodoApp() {
     const custom = tasks.map((t) => t.category).filter((c) => !(PRESET_CATEGORIES as readonly string[]).includes(c))
     return Array.from(new Set(custom)).sort((a, b) => a.localeCompare(b))
   }, [tasks])
+  const allCategories = useMemo(() => [...PRESET_CATEGORIES, ...categories], [categories])
   const categoryItems = useMemo(
     () => [{ value: "all", label: "All categories" }, ...[...PRESET_CATEGORIES, ...categories].map((c) => ({ value: c, label: c }))],
     [categories]
@@ -96,11 +110,24 @@ export function TodoApp() {
       tasks.filter(
         (t) =>
           (categoryFilter === "all" || t.category === categoryFilter) &&
-          (priorityFilter === "all" || t.priority === priorityFilter)
+          (priorityFilter === "all" || t.priority === priorityFilter) &&
+          matchesQuery(t, query)
       ),
-    [tasks, categoryFilter, priorityFilter]
+    [tasks, categoryFilter, priorityFilter, query]
   )
   const filtersActive = categoryFilter !== "all" || priorityFilter !== "all"
+  const searching = query.trim().length > 0
+
+  // Progress across all tasks (not just the filtered view): ticked today vs. still due.
+  const progress = useMemo(() => {
+    let done = 0
+    let open = 0
+    for (const t of tasks) {
+      if (t.completedAt && toDateString(new Date(t.completedAt)) === today) done++
+      else if (!t.completed && t.dueDate && t.dueDate <= today) open++
+    }
+    return { done, total: done + open }
+  }, [tasks, today])
 
   const { overdue, dueToday, upcoming, completed } = useMemo(() => {
     const open = sortTasks(filtered.filter((t) => !t.completed), sort)
@@ -163,6 +190,8 @@ export function TodoApp() {
 
   const changeSubtasks = (task: Task, subtasks: Subtask[]) => update(task.id, { subtasks })
 
+  const viewFor = (dueDate?: string): View => (dueDate && dueDate <= today ? "today" : "upcoming")
+
   const submit = (draft: TaskDraft) => {
     if (sheet.task) {
       update(sheet.task.id, draft)
@@ -170,26 +199,81 @@ export function TodoApp() {
     } else {
       add({ ...draft, completed: false, createdAt: new Date().toISOString() })
       toast.success("Task created", { description: draft.title })
+      if (sheet.fromQuick) {
+        setQuick("")
+        setView(viewFor(draft.dueDate))
+      }
     }
     setSheet({ open: false })
   }
 
-  const quickAdd = () => {
-    const title = quick.trim()
-    if (!title) return
-    add({
-      title: title.slice(0, 200),
-      priority: priorityFilter === "all" ? "medium" : (priorityFilter as TaskPriority),
-      dueDate: today,
-      category: categoryFilter === "all" ? "Personal" : categoryFilter,
-      recurrence: "none",
-      subtasks: [],
+  const quickAdd = (draft: TaskDraft) => {
+    add({ ...draft, completed: false, createdAt: new Date().toISOString() })
+    setQuick("")
+    const target = viewFor(draft.dueDate)
+    setView(target)
+    toast.success(
+      target === "today" ? "Added to Today" : draft.dueDate ? `Added for ${formatShortDate(draft.dueDate)}` : "Task added",
+      { description: draft.title }
+    )
+  }
+
+  const duplicateTask = (task: Task) => {
+    const copy = add({
+      title: task.title,
+      notes: task.notes,
+      priority: task.priority,
+      dueDate: task.dueDate,
+      dueTime: task.dueTime,
+      category: task.category,
+      recurrence: task.recurrence,
+      subtasks: task.subtasks.map((s) => ({ id: createId(), title: s.title, done: false })),
       completed: false,
       createdAt: new Date().toISOString(),
     })
-    setQuick("")
-    setView("today")
-    toast.success("Added to Today", { description: title })
+    if (task.completed) setView(viewFor(task.dueDate))
+    toast.success("Task duplicated", { description: task.title, action: { label: "Undo", onClick: () => remove(copy.id) } })
+  }
+
+  const focusTask = (task: Task) => {
+    startFocus({ taskId: task.id })
+    toast.success("Focus started", { description: task.title })
+    router.push("/tools/focus")
+  }
+
+  const breakDown = (task: Task) => {
+    setBreakdownTask(task)
+    void breakdown.run(task.title, task.notes)
+  }
+
+  const addBreakdown = (titles: string[]) => {
+    const target = breakdownTask
+    if (!target || !titles.length) return
+    const added = titles.map((title) => ({ id: createId(), title, done: false }))
+    const ids = new Set(added.map((s) => s.id))
+    update(target.id, (prev) => ({ ...prev, subtasks: [...prev.subtasks, ...added] }))
+    toast.success(`Added ${added.length} ${added.length === 1 ? "subtask" : "subtasks"}`, {
+      description: target.title,
+      action: {
+        label: "Undo",
+        onClick: () => update(target.id, (prev) => ({ ...prev, subtasks: prev.subtasks.filter((s) => !ids.has(s.id)) })),
+      },
+    })
+  }
+
+  const moveOverdueToToday = (list: Task[]) => {
+    if (!list.length) return
+    const previous = new Map(list.map((t) => [t.id, t.dueDate]))
+    set((prev) => prev.map((t) => (previous.has(t.id) ? { ...t, dueDate: today } : t)))
+    toast.success(`Moved ${list.length} ${list.length === 1 ? "task" : "tasks"} to today`, {
+      action: {
+        label: "Undo",
+        onClick: () =>
+          set((prev) =>
+            prev.map((t) => (previous.has(t.id) && t.dueDate === today ? { ...t, dueDate: previous.get(t.id) } : t))
+          ),
+      },
+    })
   }
 
   const clearCompleted = () => {
@@ -209,7 +293,15 @@ export function TodoApp() {
 
   /* ---------------------------------------------------------- render */
 
-  const cardProps = { onToggle: toggle, onEdit: openEdit, onDelete: deleteTask, onSubtasksChange: changeSubtasks }
+  const cardProps: CardHandlers = {
+    onToggle: toggle,
+    onEdit: openEdit,
+    onDelete: deleteTask,
+    onSubtasksChange: changeSubtasks,
+    onFocus: focusTask,
+    onDuplicate: duplicateTask,
+    onBreakDown: aiConfigured ? breakDown : undefined,
+  }
 
   const filters = (
     <TaskFilters
@@ -224,7 +316,18 @@ export function TodoApp() {
   )
 
   const tabEmpty = (title: string, description: string, icon = CircleCheckBig) =>
-    filtersActive ? (
+    searching ? (
+      <EmptyState
+        icon={SearchX}
+        title="No tasks match"
+        description={`Nothing in this tab matches "${query.trim()}".`}
+        action={
+          <Button variant="outline" onClick={() => setQuery("")}>
+            Clear search
+          </Button>
+        }
+      />
+    ) : filtersActive ? (
       <EmptyState
         icon={FilterX}
         title="No tasks match these filters"
@@ -265,29 +368,51 @@ export function TodoApp() {
       ) : (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]">
           <div className="min-w-0 space-y-4">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                quickAdd()
+            <QuickAdd
+              value={quick}
+              onChange={setQuick}
+              aiConfigured={aiConfigured}
+              categories={allCategories}
+              defaults={{
+                priority: priorityFilter === "all" ? "medium" : (priorityFilter as TaskPriority),
+                category: categoryFilter === "all" ? "Personal" : categoryFilter,
               }}
-              className="flex gap-2"
-            >
-              <label htmlFor="quick-add" className="sr-only">
-                Quick add a task for today
-              </label>
+              today={today}
+              onAdd={quickAdd}
+              onEdit={(draft) => setSheet({ open: true, defaults: draft, fromQuick: true })}
+            />
+
+            <div className="relative" role="search">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
               <Input
-                id="quick-add"
-                value={quick}
-                onChange={(e) => setQuick(e.target.value)}
-                placeholder="Add a task for today and press Enter"
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && query) {
+                    e.preventDefault()
+                    setQuery("")
+                  }
+                }}
+                placeholder="Search tasks, notes, subtasks…"
+                aria-label="Search tasks"
                 autoComplete="off"
-                maxLength={200}
-                className="h-11 bg-card"
+                maxLength={100}
+                className="h-10 bg-card pr-10 pl-9 [&::-webkit-search-cancel-button]:hidden"
               />
-              <Button type="submit" size="icon" className="size-11" aria-label="Add task" disabled={!quick.trim()}>
-                <Plus aria-hidden />
-              </Button>
-            </form>
+              {query ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Clear search"
+                  onClick={() => setQuery("")}
+                  className="absolute top-0 right-0 text-muted-foreground"
+                >
+                  <X aria-hidden />
+                </Button>
+              ) : null}
+            </div>
 
             <div className="lg:hidden">{filters}</div>
 
@@ -305,12 +430,27 @@ export function TodoApp() {
               </TabsList>
 
               <TabsContent value="today" className="space-y-5">
+                {progress.total > 0 && !searching ? <TodayProgress done={progress.done} total={progress.total} /> : null}
                 {counts.today === 0 ? (
-                  tabEmpty("Nothing due today", "Enjoy the breathing room — or plan ahead in Upcoming.", Sparkles)
+                  tabEmpty(
+                    progress.done > 0 ? "All done for today" : "Nothing due today",
+                    "Enjoy the breathing room — or plan ahead in Upcoming.",
+                    Sparkles
+                  )
                 ) : (
                   <>
                     {overdue.length ? (
-                      <TaskSection title="Overdue" tone="danger" tasks={overdue} cardProps={cardProps} />
+                      <TaskSection
+                        title="Overdue"
+                        tone="danger"
+                        tasks={overdue}
+                        cardProps={cardProps}
+                        action={
+                          <Button variant="ghost" size="sm" className="-my-1 h-10 text-primary" onClick={() => moveOverdueToToday(overdue)}>
+                            <CalendarClock aria-hidden /> Move all to today
+                          </Button>
+                        }
+                      />
                     ) : null}
                     {dueToday.length ? <TaskSection title="Today" tasks={dueToday} cardProps={cardProps} /> : null}
                   </>
@@ -387,7 +527,12 @@ export function TodoApp() {
         categories={categories}
         onSubmit={submit}
         onDelete={deleteTask}
+        aiEnabled={aiConfigured}
       />
+
+      {aiConfigured ? (
+        <SubtaskSuggestionsSheet s={breakdown} taskTitle={breakdownTask?.title} onAdd={addBreakdown} />
+      ) : null}
 
       <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
         <AlertDialogContent>
@@ -411,7 +556,34 @@ export function TodoApp() {
 
 /* ------------------------------------------------------------ pieces */
 
-type CardHandlers = Pick<React.ComponentProps<typeof TaskCard>, "onToggle" | "onEdit" | "onDelete" | "onSubtasksChange">
+type CardHandlers = Pick<
+  React.ComponentProps<typeof TaskCard>,
+  "onToggle" | "onEdit" | "onDelete" | "onSubtasksChange" | "onFocus" | "onDuplicate" | "onBreakDown"
+>
+
+function TodayProgress({ done, total }: { done: number; total: number }) {
+  const pct = total ? Math.round((done / total) * 100) : 0
+  return (
+    <div className="rounded-2xl border bg-card px-3.5 py-3 shadow-soft">
+      <div className="flex items-baseline justify-between gap-2 text-sm">
+        <span className="font-medium" aria-live="polite">
+          {done} of {total} done today
+        </span>
+        <span className="text-xs text-muted-foreground tabular-nums">{pct}%</span>
+      </div>
+      <div
+        role="progressbar"
+        aria-label="Today's progress"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={done}
+        className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-muted"
+      >
+        <div className="h-full rounded-full bg-success transition-[width] duration-500" style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
 
 function TaskList({ tasks, cardProps }: { tasks: Task[]; cardProps: CardHandlers }) {
   return (
@@ -438,25 +610,30 @@ function TaskSection({
   tasks,
   cardProps,
   tone,
+  action,
 }: {
   title: string
   tasks: Task[]
   cardProps: CardHandlers
   tone?: "danger"
+  action?: React.ReactNode
 }) {
   return (
     <section aria-label={title}>
-      <h2
-        className={cn(
-          "mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase",
-          tone === "danger" ? "text-destructive" : "text-muted-foreground"
-        )}
-      >
-        {title}
-        <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[0.7rem] font-medium text-muted-foreground">
-          {tasks.length}
-        </span>
-      </h2>
+      <div className="mb-2 flex min-h-8 items-center justify-between gap-2">
+        <h2
+          className={cn(
+            "flex items-center gap-2 text-xs font-semibold tracking-wide uppercase",
+            tone === "danger" ? "text-destructive" : "text-muted-foreground"
+          )}
+        >
+          {title}
+          <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[0.7rem] font-medium text-muted-foreground">
+            {tasks.length}
+          </span>
+        </h2>
+        {action}
+      </div>
       <TaskList tasks={tasks} cardProps={cardProps} />
     </section>
   )

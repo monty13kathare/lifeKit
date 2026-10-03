@@ -10,9 +10,8 @@ import {
   HeartPulse,
   KeyRound,
   Landmark,
-  Languages,
+  Brain,
   ListTodo,
-  Mic,
   Minimize2,
   NotebookPen,
   Percent,
@@ -27,7 +26,13 @@ import {
   ScanText,
   ShieldCheck,
   Sunrise,
-  Volume2,
+  Timer,
+  PenLine,
+  Puzzle,
+  Scale,
+  Target,
+  FileText,
+  BookA,
   type LucideIcon,
 } from "lucide-react"
 
@@ -35,14 +40,15 @@ export type ToolCategory =
   | "documents"
   | "images"
   | "scan"
-  | "communication"
+  | "ai"
   | "finance"
   | "security"
   | "productivity"
   | "personal"
+  | "learn"
 
 /** Which top-level area of the app a tool belongs to. */
-export type ToolSection = "tools" | "life"
+export type ToolSection = "tools" | "life" | "learn"
 
 export interface Tool {
   id: string
@@ -60,11 +66,12 @@ export const CATEGORY_META: Record<ToolCategory, { label: string; description: s
   documents: { label: "Documents", description: "Create, edit and scan PDFs" },
   images: { label: "Images", description: "Resize, compress and convert" },
   scan: { label: "Scan", description: "QR codes, barcodes and text" },
-  communication: { label: "Communication", description: "Speech and translation" },
+  ai: { label: "AI Productivity", description: "Write, summarize, plan and decide with Gemini" },
   finance: { label: "Finance", description: "Everyday money maths" },
   security: { label: "Security", description: "Passwords and private sharing" },
   productivity: { label: "Productivity", description: "Plan your days" },
   personal: { label: "Personal", description: "Health, links and info" },
+  learn: { label: "Learn Skills", description: "Practice prompting, English and logic" },
 }
 
 const A = {
@@ -96,10 +103,11 @@ export const TOOLS: Tool[] = [
   { id: "barcode-scanner", name: "Barcode Scanner", description: "Read product and shipping barcodes.", href: "/tools/barcode-scanner", icon: ScanBarcode, category: "scan", section: "tools", accent: A.indigo },
   { id: "qr-generator", name: "QR Generator", description: "Create QR codes for links and content.", href: "/tools/qr-generator", icon: QrCode, category: "scan", section: "tools", accent: A.indigo },
 
-  // Communication
-  { id: "voice-to-text", name: "Voice to Text", description: "Dictate and get a live transcript.", href: "/tools/voice-to-text", icon: Mic, category: "communication", section: "tools", accent: A.teal },
-  { id: "text-to-voice", name: "Text to Voice", description: "Have any text read aloud.", href: "/tools/text-to-voice", icon: Volume2, category: "communication", section: "tools", accent: A.teal },
-  { id: "translator", name: "Translator", description: "Translate between languages.", href: "/tools/translator", icon: Languages, category: "communication", section: "tools", accent: A.teal },
+  // AI Productivity
+  { id: "ai-writer", name: "AI Writer", description: "Draft, rewrite and translate emails and messages.", href: "/tools/ai-writer", icon: PenLine, category: "ai", section: "tools", accent: A.violet },
+  { id: "summarizer", name: "Summarizer", description: "TL;DR, key points and action items from any text.", href: "/tools/summarizer", icon: FileText, category: "ai", section: "tools", accent: A.violet },
+  { id: "goal-planner", name: "Goal Planner", description: "Turn a goal into milestones and tasks.", href: "/tools/goal-planner", icon: Target, category: "ai", section: "tools", accent: A.violet },
+  { id: "decision-helper", name: "Decision Helper", description: "Weigh options with a scored pros & cons matrix.", href: "/tools/decision-helper", icon: Scale, category: "ai", section: "tools", accent: A.violet },
 
   // Finance
   { id: "smart-calculator", name: "Smart Calculator", description: "Type maths naturally, like “20% of 15000”.", href: "/tools/calculators/smart", icon: Calculator, category: "finance", section: "tools", accent: A.emerald },
@@ -110,26 +118,32 @@ export const TOOLS: Tool[] = [
 
   // Security
   { id: "password-generator", name: "Password Generator", description: "Strong, random passwords in one tap.", href: "/tools/password-generator", icon: KeyRound, category: "security", section: "tools", accent: A.amber },
-  { id: "secure-share", name: "SecureShare", description: "Share files with expiry and a password.", href: "/tools/secure-share", icon: ShieldCheck, category: "security", section: "tools", accent: A.amber },
+  { id: "secure-share", name: "SecureShare", description: "Upload files & create secure zero-knowledge public links.", href: "/tools/secure-share", icon: ShieldCheck, category: "security", section: "tools", accent: A.amber },
 
   // My Life — productivity
   { id: "todo", name: "Tasks", description: "To-dos with priorities and subtasks.", href: "/tools/todo", icon: ListTodo, category: "productivity", section: "life", accent: A.indigo },
   { id: "routine-planner", name: "Daily Routine", description: "Build a daily timeline that sticks.", href: "/tools/routine-planner", icon: Sunrise, category: "productivity", section: "life", accent: A.orange },
   { id: "calendar", name: "Calendar", description: "Month, week, day and agenda views.", href: "/tools/calendar", icon: CalendarDays, category: "productivity", section: "life", accent: A.sky },
   { id: "reminders", name: "Reminders", description: "Never forget the important stuff.", href: "/tools/reminders", icon: Bell, category: "productivity", section: "life", accent: A.amber },
+  { id: "focus", name: "Focus Timer", description: "Pomodoro sessions linked to your tasks.", href: "/tools/focus", icon: Timer, category: "productivity", section: "life", accent: A.rose },
   { id: "notes", name: "Notes", description: "Quick notes, including text from OCR.", href: "/tools/notes", icon: NotebookPen, category: "productivity", section: "life", accent: A.violet },
 
   // My Life — personal
   { id: "wellness", name: "Wellness", description: "Water, sleep, activity and habits.", href: "/tools/wellness", icon: HeartPulse, category: "personal", section: "life", accent: A.rose },
   { id: "bookmarks", name: "Bookmarks", description: "Save useful links for later.", href: "/tools/bookmarks", icon: Bookmark, category: "personal", section: "life", accent: A.teal },
   { id: "important-information", name: "Important Info", description: "Emergency contacts and key details.", href: "/tools/important-information", icon: Contact, category: "personal", section: "life", accent: A.emerald },
+
+  // Learn Skills
+  { id: "learn-prompting", name: "AI Prompting", description: "Write prompts that get great results.", href: "/learn/prompting", icon: Brain, category: "learn", section: "learn", accent: A.violet },
+  { id: "learn-english", name: "English", description: "Vocabulary, grammar and writing practice.", href: "/learn/english", icon: BookA, category: "learn", section: "learn", accent: A.sky },
+  { id: "learn-logic", name: "Logic & Reasoning", description: "Puzzles, patterns and mental maths.", href: "/learn/logic", icon: Puzzle, category: "learn", section: "learn", accent: A.amber },
 ]
 
 export const TOOL_CATEGORY_ORDER: ToolCategory[] = [
   "documents",
   "images",
   "scan",
-  "communication",
+  "ai",
   "finance",
   "security",
 ]

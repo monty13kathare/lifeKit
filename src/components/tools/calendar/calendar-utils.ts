@@ -150,3 +150,40 @@ export function occurrenceTimeLabel(o: EventOccurrence): string {
   if (sameDay) return `${fmt(o.start)} – ${fmt(o.end)}`
   return `${format(o.start, "MMM d")}, ${fmt(o.start)} – ${format(o.end, "MMM d")}, ${fmt(o.end)}`
 }
+
+/** Select values for the event "Alert" field ("none" = no alert, otherwise minutes before). */
+export const ALERT_ITEMS: { value: string; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "0", label: "At start time" },
+  { value: "5", label: "5 minutes before" },
+  { value: "10", label: "10 minutes before" },
+  { value: "15", label: "15 minutes before" },
+  { value: "30", label: "30 minutes before" },
+  { value: "60", label: "1 hour before" },
+  { value: "1440", label: "1 day before" },
+]
+
+export const hasAlert = (alertMinutes: number | null | undefined): alertMinutes is number =>
+  alertMinutes != null && alertMinutes >= 0
+
+/** Human label for an alert lead time, e.g. "15 minutes before". */
+export function alertLabel(alertMinutes: number | null | undefined): string {
+  if (!hasAlert(alertMinutes)) return "No alert"
+  const known = ALERT_ITEMS.find((a) => a.value === String(alertMinutes))
+  if (known) return known.label
+  if (alertMinutes < 60) return `${alertMinutes} minutes before`
+  if (alertMinutes % 60 === 0) return `${alertMinutes / 60} hours before`
+  return `${alertMinutes} minutes before`
+}
+
+export const recurrenceLabel = (r: Recurrence) => RECURRENCE_ITEMS.find((i) => i.value === r)?.label ?? "Doesn't repeat"
+
+/** Days ahead the agenda search covers. */
+export const SEARCH_DAYS = 365
+
+/** Does the event match a search query (title, location, notes; case-insensitive)? */
+export function matchesQuery(e: { title: string; location?: string; notes?: string }, query: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  return [e.title, e.location, e.notes].some((s) => s?.toLowerCase().includes(q))
+}

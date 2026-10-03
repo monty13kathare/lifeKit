@@ -4,7 +4,9 @@ import { addDays, addHours, format, parseISO, subDays } from "date-fns"
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { Repeat, Trash2 } from "lucide-react"
+import { useState } from "react"
+import Link from "next/link"
+import { BellRing, Copy, Repeat, Trash2 } from "lucide-react"
 import { Notice } from "@/components/common/notice"
 import { ResponsiveSheet } from "@/components/common/responsive-sheet"
 import { Button } from "@/components/ui/button"
@@ -12,9 +14,11 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { useHydrated } from "@/hooks/use-store"
 import { combineDateTime, toDateString } from "@/lib/dates"
+import { notificationSupport } from "@/lib/reminders"
 import type { CalendarEvent, EventColor, Recurrence } from "@/types"
-import { RECURRENCE_ITEMS } from "./calendar-utils"
+import { ALERT_ITEMS, alertLabel, hasAlert, RECURRENCE_ITEMS } from "./calendar-utils"
 import { EVENT_COLOR_KEYS, EVENT_COLORS } from "./event-colors"
 import { FormField, SwatchPicker } from "./form-field"
 
@@ -31,6 +35,7 @@ const schema = z
     notes: z.string().max(2000, "Notes are limited to 2000 characters"),
     recurrence: z.enum(["none", "daily", "weekly", "monthly", "yearly"]),
     recurrenceUntil: z.string(),
+    alert: z.string().regex(/^(none|d{1,5})$/),
   })
   .superRefine((v, ctx) => {
     if (!v.allDay) {
@@ -66,22 +71,35 @@ interface EventFormSheetProps {
   prefill?: EventPrefill
   onSubmit: (draft: EventDraft) => void
   onDelete?: (event: CalendarEvent) => void
+  /** Open a copy of `event` in the form. */
+  onDuplicate?: (event: CalendarEvent) => void
+  /** Prefill a new event with full details (duplicate, AI suggestion). Ignored when `event` is set. */
+  initial?: EventDraft
+  /** Sheet title override for new events. */
+  heading?: string
+  /** Changes force the form to reset (e.g. switching from edit to a copy). */
+  formKey?: string
 }
 
 const FORM_ID = "event-form"
 
 export function EventFormSheet(props: EventFormSheetProps) {
-  const { open, onOpenChange, event, onDelete } = props
+  const { open, onOpenChange, event, onDelete, onDuplicate, heading } = props
   return (
     <ResponsiveSheet
       open={open}
       onOpenChange={onOpenChange}
-      title={event ? "Edit event" : "New event"}
+      title={event ? "Edit event" : (heading ?? "New event")}
       footer={
         <div className="flex w-full items-center gap-2">
           {event && onDelete ? (
             <Button type="button" variant="destructive" size="lg" className="sm:h-10" onClick={() => onDelete(event)}>
               <Trash2 aria-hidden /> <span className="sr-only sm:not-sr-only">{event.recurrence !== "none" ? "Delete series" : "Delete"}</span>
+            </Button>
+          ) : null}
+          {event && onDuplicate ? (
+            <Button type="button" variant="outline" size="lg" className="sm:h-10" onClick={() => onDuplicate(event)} aria-label="Duplicate event">
+              <Copy aria-hidden /> <span className="hidden sm:inline">Duplicate</span>
             </Button>
           ) : null}
           <div className="flex flex-1 justify-end gap-2">
@@ -95,16 +113,22 @@ export function EventFormSheet(props: EventFormSheetProps) {
         </div>
       }
     >
-      <EventForm key={open ? (event?.id ?? `new-${props.prefill?.start.getTime() ?? ""}`) : "closed"} {...props} />
+      <EventForm key={open ? (props.formKey ?? event?.id ?? `new-${props.prefill?.start.getTime() ?? ""}`) : "closed"} {...props} />
     </ResponsiveSheet>
   )
 }
 
-function initialValues(event?: CalendarEvent, prefill?: EventPrefill): FormValues {
+const alertValue = (m: number | null | undefined) => (hasAlert(m) ? String(Math.round(m)) : "none")
+
+function initialValues(event?: CalendarEvent | EventDraft, prefill?: EventPrefill): FormValues {
   if (event) {
     const s = parseISO(event.start)
     let e = parseISO(event.end)
-    if (event.allDay) e = e > s ? subDays(e, 1) : s
+    if (event.allDay) {
+      // Stored end is exclusive midnight; AI-created events may end at 23:59 the same day.
+      if (e.getHours() === 0 && e.getMinutes() === 0) e = subDays(e, 1)
+      if (e < s) e = s
+    }
     return {
       title: event.title,
       allDay: event.allDay,
@@ -117,6 +141,7 @@ function initialValues(event?: CalendarEvent, prefill?: EventPrefill): FormValue
       notes: event.notes ?? "",
       recurrence: event.recurrence,
       recurrenceUntil: event.recurrenceUntil ?? "",
+      alert: alertValue(event.alertMinutes),
     }
   }
   const s = prefill?.start ?? new Date()
@@ -133,10 +158,12 @@ function initialValues(event?: CalendarEvent, prefill?: EventPrefill): FormValue
     notes: "",
     recurrence: "none",
     recurrenceUntil: "",
+    alert: "none",
   }
 }
 
-function EventForm({ event, prefill, onSubmit }: EventFormSheetProps) {
+function EventForm({ event, prefill, initial, onSubmit }: EventFormSheetProps) {
+  const hydrated = useHydrated()
   const {
     register,
     control,
@@ -144,10 +171,17 @@ function EventForm({ event, prefill, onSubmit }: EventFormSheetProps) {
     setValue,
     getValues,
     formState: { errors },
-  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: initialValues(event, prefill) })
+  } = useForm<FormValues>({ resolver: zodResolver(schema), defaultValues: initialValues(event ?? initial, prefill) })
 
   const allDay = useWatch({ control, name: "allDay" })
   const recurrence = useWatch({ control, name: "recurrence" })
+  const alert = useWatch({ control, name: "alert" })
+  const permission = hydrated ? notificationSupport() : "granted"
+  // Keep a non-standard lead time (e.g. from AI: "2 hours before") selectable.
+  const [alertItems] = useState(() => {
+    const v = getValues("alert")
+    return ALERT_ITEMS.some((a) => a.value === v) ? ALERT_ITEMS : [...ALERT_ITEMS, { value: v, label: alertLabel(Number(v)) }]
+  })
 
   const startDateField = register("startDate", {
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -181,6 +215,7 @@ function EventForm({ event, prefill, onSubmit }: EventFormSheetProps) {
       notes: v.notes.trim() || undefined,
       recurrence: v.recurrence as Recurrence,
       recurrenceUntil: v.recurrence !== "none" && v.recurrenceUntil ? v.recurrenceUntil : undefined,
+      alertMinutes: v.alert === "none" ? null : Number(v.alert),
     })
   }
 
@@ -270,6 +305,44 @@ function EventForm({ event, prefill, onSubmit }: EventFormSheetProps) {
           </FormField>
         ) : null}
       </div>
+
+      <FormField label="Alert">
+        {(p) => (
+          <Controller
+            control={control}
+            name="alert"
+            render={({ field }) => (
+              <Select items={alertItems} value={field.value} onValueChange={(v) => v && field.onChange(v)}>
+                <SelectTrigger id={p.id} className="h-11 w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {alertItems.map((a) => (
+                    <SelectItem key={a.value} value={a.value}>
+                      {a.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+        )}
+      </FormField>
+      {alert !== "none" && permission !== "granted" ? (
+        <p className="-mt-2 flex items-start gap-2 text-xs text-muted-foreground" role="status">
+          <BellRing className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+          {permission === "unsupported" ? (
+            <span>Alerts appear in LifeKit while it&apos;s open. This browser doesn&apos;t support system notifications.</span>
+          ) : (
+            <span>
+              Alerts appear in LifeKit while it&apos;s open, and as notifications if you allow them.{" "}
+              <Link href="/tools/reminders" className="font-medium text-primary underline-offset-2 hover:underline">
+                {permission === "denied" ? "Notifications are blocked — see Reminders" : "Enable notifications in Reminders"}
+              </Link>
+            </span>
+          )}
+        </p>
+      ) : null}
 
       <FormField label="Location" error={errors.location?.message}>
         {(p) => <Input {...p} {...register("location")} placeholder="Optional" autoComplete="off" className="h-11" />}

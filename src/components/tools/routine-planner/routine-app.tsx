@@ -2,21 +2,26 @@
 
 import { Fragment, useMemo, useState } from "react"
 import { addDays, addWeeks, format, isSameDay, startOfWeek } from "date-fns"
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, GripVertical, Plus, Sunrise } from "lucide-react"
+import { ArrowDown, ArrowUp, CheckCheck, ChevronLeft, ChevronRight, Flame, GripVertical, LayoutTemplate, Plus, RotateCcw, Sparkles, Sunrise } from "lucide-react"
 import { toast } from "sonner"
 import { EmptyState } from "@/components/common/empty-state"
 import { ToolPage } from "@/components/common/tool-page"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useNow } from "@/components/tools/calendar/use-now"
+import { useAiStatus } from "@/hooks/use-ai-status"
 import { useIsDesktop } from "@/hooks/use-media-query"
 import { useRoutines } from "@/hooks/use-lifekit-data"
 import { useHydrated } from "@/hooks/use-store"
+import { aiRoutineToItems } from "@/lib/ai/convert"
 import { fromDateString, toDateString } from "@/lib/dates"
 import { cn } from "@/lib/utils"
 import type { RoutineItem } from "@/types"
+import { RoutineBuilder, type ApplyMode, type BuilderMode } from "./routine-builder"
 import { RoutineCard } from "./routine-card"
 import { RoutineFormSheet, type RoutineDraft } from "./routine-form"
+import { perfectDayStreak, weekCompletion } from "./routine-stats"
+import type { RoutinePreviewItem } from "./routine-templates"
 import { formatClock, isActiveAt, itemsForDate, reorderPatch, sortRoutine, toMinutes, type RoutineSort } from "./routine-utils"
 
 type SheetState = { open: boolean; item?: RoutineItem; defaults?: Partial<RoutineDraft> }
@@ -27,7 +32,9 @@ const blockHeight = (min: number) => Math.round(Math.min(200, Math.max(68, 52 + 
 export function RoutineApp() {
   const hydrated = useHydrated()
   const isDesktop = useIsDesktop()
-  const { routines, add, update, remove, upsert } = useRoutines()
+  const { routines, add, update, remove, upsert, set } = useRoutines()
+  const ai = useAiStatus()
+  const aiConfigured = !!ai?.configured
   const now = useNow()
   const today = toDateString(now)
 
@@ -38,6 +45,7 @@ export function RoutineApp() {
   const [sheet, setSheet] = useState<SheetState>({ open: false })
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
+  const [builder, setBuilder] = useState<{ open: boolean; mode: BuilderMode; session: number }>({ open: false, mode: "templates", session: 0 })
 
   const weekStart = addWeeks(startOfWeek(fromDateString(selected)), weekOffset)
   const week = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -46,6 +54,8 @@ export function RoutineApp() {
   const doneCount = dayItems.filter((i) => i.completedDates.includes(selected)).length
   const isToday = selected === today
   const isFuture = selected > today
+  const streak = useMemo(() => perfectDayStreak(routines, today), [routines, today])
+  const weekStats = useMemo(() => weekCompletion(routines, today), [routines, today])
   const nowMin = now.getHours() * 60 + now.getMinutes()
   const activeId = isToday ? dayItems.find((i) => isActiveAt(i, nowMin))?.id : undefined
   // Index to draw the "now" line before (time view, today, nothing active right now).
@@ -85,6 +95,58 @@ export function RoutineApp() {
       })
     }
     setSheet({ open: false })
+  }
+
+  const openBuilder = (mode: BuilderMode) => setBuilder((b) => ({ open: true, mode, session: b.session + 1 }))
+
+  const applyBuilder = (items: RoutinePreviewItem[], mode: ApplyMode) => {
+    if (mode === "replace") {
+      const previous = routines
+      set(aiRoutineToItems(items, 0))
+      toast.success(`Routine replaced with ${items.length} blocks`, { action: { label: "Undo", onClick: () => set(previous) } })
+      return
+    }
+    const start = routines.reduce((m, r) => Math.max(m, r.order), -1) + 1
+    const created = aiRoutineToItems(items, start)
+    const ids = new Set(created.map((c) => c.id))
+    set((prev) => [...prev, ...created])
+    toast.success(`Added ${created.length} ${created.length === 1 ? "block" : "blocks"} to your routine`, {
+      action: { label: "Undo", onClick: () => set((prev) => prev.filter((r) => !ids.has(r.id))) },
+    })
+  }
+
+  const duplicateItem = (item: RoutineItem) => {
+    const order = routines.reduce((m, r) => Math.max(m, r.order), -1) + 1
+    const copy = add({
+      title: `${item.title} (copy)`.slice(0, 80),
+      time: item.time,
+      durationMinutes: item.durationMinutes,
+      repeatDays: [...item.repeatDays],
+      color: item.color,
+      order,
+      completedDates: [],
+    })
+    setSheet({ open: true, item: copy })
+    toast.success("Block duplicated", {
+      description: "Now editing the copy.",
+      action: { label: "Undo", onClick: () => { remove(copy.id); setSheet({ open: false }) } },
+    })
+  }
+
+  /** Tick every block for the selected day (done = true) or clear them (done = false). */
+  const setDayDone = (done: boolean) => {
+    const changed = dayItems.filter((i) => i.completedDates.includes(selected) !== done)
+    if (!changed.length) return
+    const snapshot = changed.map((i) => ({ id: i.id, completedDates: i.completedDates }))
+    changed.forEach((i) =>
+      update(i.id, {
+        completedDates: done ? [...i.completedDates, selected] : i.completedDates.filter((d) => d !== selected),
+      })
+    )
+    toast.success(done ? "All blocks marked done" : "Day reset", {
+      description: format(fromDateString(selected), "EEEE, MMM d"),
+      action: { label: "Undo", onClick: () => snapshot.forEach((x) => update(x.id, { completedDates: x.completedDates })) },
+    })
   }
 
   const deleteItem = (item: RoutineItem) => {
@@ -130,6 +192,18 @@ export function RoutineApp() {
         </Button>
       }
     >
+      {hydrated && routines.length > 0 ? (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {aiConfigured ? (
+            <Button variant="outline" onClick={() => openBuilder("ai")}>
+              <Sparkles aria-hidden /> Generate my routine
+            </Button>
+          ) : null}
+          <Button variant="outline" onClick={() => openBuilder("templates")}>
+            <LayoutTemplate aria-hidden /> Templates
+          </Button>
+        </div>
+      ) : null}
       {!hydrated ? (
         <div className="space-y-4" aria-busy="true" aria-label="Loading routine">
           <Skeleton className="h-20 w-full rounded-2xl" />
@@ -143,9 +217,15 @@ export function RoutineApp() {
           title="Your routine is empty."
           description="Add blocks like Wake up, Exercise or Deep work and build a day that runs itself."
           action={
-            <Button size="lg" onClick={() => setSheet({ open: true })}>
-              <Plus aria-hidden /> Add first block
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button size="lg" onClick={() => setSheet({ open: true })}>
+                <Plus aria-hidden /> Add first block
+              </Button>
+              <Button size="lg" variant="outline" onClick={() => openBuilder(aiConfigured ? "ai" : "templates")}>
+                {aiConfigured ? <Sparkles aria-hidden /> : <LayoutTemplate aria-hidden />}
+                {aiConfigured ? "Generate my routine" : "Use a template"}
+              </Button>
+            </div>
           }
         />
       ) : (
@@ -208,7 +288,7 @@ export function RoutineApp() {
 
             {/* Mobile progress */}
             <div className="lg:hidden">
-              <ProgressSummary done={doneCount} total={dayItems.length} date={selected} today={today} />
+              <ProgressSummary done={doneCount} total={dayItems.length} date={selected} today={today} streak={streak} weekPct={weekStats.pct} />
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -231,6 +311,16 @@ export function RoutineApp() {
                 ))}
               </div>
             </div>
+            {dayItems.length > 0 && !isFuture ? (
+              <div className="-mt-2 flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" disabled={doneCount === dayItems.length} onClick={() => setDayDone(true)}>
+                  <CheckCheck aria-hidden /> Mark all done
+                </Button>
+                <Button size="sm" variant="ghost" disabled={doneCount === 0} onClick={() => setDayDone(false)}>
+                  <RotateCcw aria-hidden /> Reset day
+                </Button>
+              </div>
+            ) : null}
             {sortMode === "custom" ? (
               <p className="-mt-3 text-xs text-muted-foreground">
                 Use the arrows{isDesktop ? " or drag blocks" : ""} to arrange your routine.
@@ -348,7 +438,7 @@ export function RoutineApp() {
 
           <aside className="hidden lg:block">
             <div className="sticky top-6 space-y-4">
-              <ProgressSummary done={doneCount} total={dayItems.length} date={selected} today={today} />
+              <ProgressSummary done={doneCount} total={dayItems.length} date={selected} today={today} streak={streak} weekPct={weekStats.pct} />
               <Button className="w-full" variant="outline" onClick={() => setSheet({ open: true })}>
                 <Plus aria-hidden /> Add block
               </Button>
@@ -373,6 +463,18 @@ export function RoutineApp() {
         defaults={sheet.defaults}
         onSubmit={submit}
         onDelete={deleteItem}
+        onDuplicate={duplicateItem}
+        allItems={routines}
+      />
+
+      <RoutineBuilder
+        key={builder.session}
+        open={builder.open}
+        onOpenChange={(open) => setBuilder((b) => ({ ...b, open }))}
+        initialMode={builder.mode}
+        aiConfigured={aiConfigured}
+        existingCount={routines.length}
+        onApply={applyBuilder}
       />
     </ToolPage>
   )
@@ -405,44 +507,78 @@ function NowLine({ minutes }: { minutes: number }) {
   )
 }
 
-function ProgressSummary({ done, total, date, today }: { done: number; total: number; date: string; today: string }) {
+function ProgressSummary({
+  done,
+  total,
+  date,
+  today,
+  streak,
+  weekPct,
+}: {
+  done: number
+  total: number
+  date: string
+  today: string
+  streak: number
+  weekPct: number | null
+}) {
   const pct = total ? Math.round((done / total) * 100) : 0
   const r = 26
   const circ = 2 * Math.PI * r
   const label = date === today ? "today" : date < today ? "that day" : "planned"
   return (
-    <div className="flex items-center gap-4 rounded-2xl border bg-card p-4 shadow-soft">
-      <div className="relative size-16 shrink-0" role="img" aria-label={`${done} of ${total} done (${pct}%)`}>
-        <svg viewBox="0 0 64 64" className="size-16 -rotate-90">
-          <circle cx="32" cy="32" r={r} fill="none" strokeWidth="6" className="stroke-surface-muted" />
-          <circle
-            cx="32"
-            cy="32"
-            r={r}
-            fill="none"
-            strokeWidth="6"
-            strokeLinecap="round"
-            className="stroke-success transition-[stroke-dashoffset] duration-500"
-            strokeDasharray={circ}
-            strokeDashoffset={circ - (circ * pct) / 100}
-          />
-        </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold tabular-nums">{pct}%</span>
+    <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-soft">
+      <div className="flex items-center gap-4">
+        <div className="relative size-16 shrink-0" role="img" aria-label={`${done} of ${total} done (${pct}%)`}>
+          <svg viewBox="0 0 64 64" className="size-16 -rotate-90">
+            <circle cx="32" cy="32" r={r} fill="none" strokeWidth="6" className="stroke-surface-muted" />
+            <circle
+              cx="32"
+              cy="32"
+              r={r}
+              fill="none"
+              strokeWidth="6"
+              strokeLinecap="round"
+              className="stroke-success transition-[stroke-dashoffset] duration-500"
+              strokeDasharray={circ}
+              strokeDashoffset={circ - (circ * pct) / 100}
+            />
+          </svg>
+          <span className="absolute inset-0 flex items-center justify-center text-sm font-semibold tabular-nums">{pct}%</span>
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold">
+            {done} of {total} done
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {total === 0
+              ? "No blocks scheduled."
+              : done === total
+                ? "Everything ticked off. Nice work!"
+                : date > today
+                  ? `${total} blocks ${label}.`
+                  : `${total - done} left ${label}.`}
+          </p>
+        </div>
       </div>
-      <div className="min-w-0">
-        <p className="font-semibold">
-          {done} of {total} done
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {total === 0
-            ? "No blocks scheduled."
-            : done === total
-              ? "Everything ticked off. Nice work!"
-              : date > today
-                ? `${total} blocks ${label}.`
-                : `${total - done} left ${label}.`}
-        </p>
-      </div>
+      <dl className="grid grid-cols-2 gap-2 border-t pt-3 text-sm">
+        <div className="flex items-center gap-2 rounded-xl bg-surface-muted px-3 py-2">
+          <Flame className={cn("size-4 shrink-0", streak > 0 ? "text-warning" : "text-muted-foreground")} aria-hidden />
+          <div className="min-w-0">
+            <dt className="text-xs text-muted-foreground">Perfect days</dt>
+            <dd className="font-semibold tabular-nums">
+              {streak} {streak === 1 ? "day" : "days"}
+            </dd>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 rounded-xl bg-surface-muted px-3 py-2">
+          <CheckCheck className="size-4 shrink-0 text-success" aria-hidden />
+          <div className="min-w-0">
+            <dt className="text-xs text-muted-foreground">This week</dt>
+            <dd className="font-semibold tabular-nums">{weekPct === null ? "—" : `${weekPct}%`}</dd>
+          </div>
+        </div>
+      </dl>
     </div>
   )
 }

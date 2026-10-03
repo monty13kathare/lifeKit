@@ -6,6 +6,7 @@ import { useTheme } from "next-themes"
 import { Bell, ChevronRight, Database, Eraser, HardDrive, Palette, ShieldCheck, Trash2, UserRound } from "lucide-react"
 import { toast } from "sonner"
 import { InstallCard } from "@/components/layout/install-card"
+import { AiLanguageToggle } from "@/components/common/ai-language-toggle"
 import { THEME_OPTIONS } from "@/components/navigation/theme-toggle"
 import {
   AlertDialog,
@@ -185,6 +186,13 @@ export function SettingsView() {
             </SelectContent>
           </Select>
         </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm">
+            AI language
+            <span className="block text-xs text-muted-foreground">AI tools, planning and Learn content are written in this language</span>
+          </span>
+          <AiLanguageToggle showLabel={false} />
+        </div>
         <p className="mt-4 text-sm text-muted-foreground">
           Customise the home screen with the <span className="font-medium text-foreground">Customize</span> button on{" "}
           <Link href="/" className="text-primary underline-offset-4 hover:underline">
@@ -225,6 +233,10 @@ export function SettingsView() {
           <li>
             • Some features use browser services: OCR downloads language data once from a public CDN, and speech recognition in
             some browsers is processed by the browser vendor.
+          </li>
+          <li>
+            • If an AI key is configured, AI features (AI tools, quick add, planning, Learn feedback) send only the text you choose to Google&apos;s Gemini
+            API through this app&apos;s server. Nothing is sent unless you use those features.
           </li>
           <li>• Camera, microphone and notification permissions are only requested when you tap a button that needs them.</li>
           <li>• Local storage is not a secure vault. Use the Sensitive option in Important Info to encrypt details.</li>

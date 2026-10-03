@@ -1,9 +1,9 @@
 "use client"
 
-import { Clock, MapPin, Repeat } from "lucide-react"
+import { Bell, Clock, MapPin, Repeat } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { EventOccurrence } from "@/types"
-import { occurrenceTimeLabel } from "./calendar-utils"
+import { alertLabel, hasAlert, occurrenceTimeLabel } from "./calendar-utils"
 import { colorClasses } from "./event-colors"
 
 export interface EventCardProps {
@@ -13,9 +13,11 @@ export interface EventCardProps {
   /** Single-line variant for dashboards. */
   compact?: boolean
   className?: string
+  /** Briefly emphasise the card (e.g. just created). */
+  highlight?: boolean
 }
 
-export function EventCard({ occurrence, onClick, compact, className }: EventCardProps) {
+export function EventCard({ occurrence, onClick, compact, className, highlight }: EventCardProps) {
   const { event } = occurrence
   const c = colorClasses(event.color)
   const time = occurrenceTimeLabel(occurrence)
@@ -42,6 +44,12 @@ export function EventCard({ occurrence, onClick, compact, className }: EventCard
               <span className={cn(compact && "sr-only")}>Repeats {event.recurrence}</span>
             </span>
           ) : null}
+          {hasAlert(event.alertMinutes) ? (
+            <span className="inline-flex items-center gap-1" title={`Alert: ${alertLabel(event.alertMinutes)}`}>
+              <Bell className="size-3.5" aria-hidden />
+              <span className="sr-only">Alert {alertLabel(event.alertMinutes)}</span>
+            </span>
+          ) : null}
         </span>
         {event.notes && !compact ? <span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">{event.notes}</span> : null}
       </span>
@@ -51,6 +59,7 @@ export function EventCard({ occurrence, onClick, compact, className }: EventCard
   const base = cn(
     "flex w-full items-start gap-3 rounded-xl border bg-card text-left shadow-soft",
     compact ? "p-2.5" : "p-3",
+    highlight && "ring-2 ring-primary ring-offset-2 ring-offset-background",
     className
   )
 

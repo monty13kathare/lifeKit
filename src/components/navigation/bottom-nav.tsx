@@ -8,7 +8,8 @@ import { activeNavHref, MOBILE_NAV } from "./nav-config"
 
 export function BottomNav() {
   const pathname = usePathname()
-  const active = activeNavHref(pathname)
+  // Learn has no bottom-bar slot on mobile; it lives under More.
+  const active = activeNavHref(pathname) === "/learn" ? "/more" : activeNavHref(pathname)
   return (
     <nav
       aria-label="Main"

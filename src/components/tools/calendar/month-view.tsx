@@ -1,10 +1,11 @@
 "use client"
 
 import { addDays, format, isSameDay, isSameMonth, startOfWeek } from "date-fns"
+import { Bell, SquareCheck } from "lucide-react"
 import { toDateString } from "@/lib/dates"
 import { cn } from "@/lib/utils"
-import type { EventOccurrence } from "@/types"
-import { occurrencesOn } from "./calendar-utils"
+import type { EventOccurrence, Task } from "@/types"
+import { hasAlert, occurrencesOn } from "./calendar-utils"
 import { colorClasses } from "./event-colors"
 
 interface MonthViewProps {
@@ -20,6 +21,10 @@ interface MonthViewProps {
   onEventClick: (o: EventOccurrence) => void
   /** Double-click (desktop) on a day creates an event. */
   onCreate: (day: Date) => void
+  /** Incomplete tasks keyed by due date (omit to hide tasks). */
+  tasksByDay?: Map<string, Task[]>
+  /** Event id to emphasise briefly. */
+  highlightId?: string | null
 }
 
 const MAX_CHIPS = 3
@@ -34,6 +39,8 @@ export function MonthView({
   onSelectDay,
   onEventClick,
   onCreate,
+  tasksByDay,
+  highlightId,
 }: MonthViewProps) {
   const days: Date[] = []
   for (let d = rangeStart; d < rangeEnd; d = addDays(d, 1)) days.push(d)
@@ -57,6 +64,14 @@ export function MonthView({
           const isToday = isSameDay(day, now)
           const selected = ds === selectedDay
           const extra = dayOccs.length - MAX_CHIPS
+          const taskCount = tasksByDay?.get(ds)?.length ?? 0
+          const label = [
+            format(day, "EEEE, MMMM d"),
+            dayOccs.length ? `${dayOccs.length} ${dayOccs.length === 1 ? "event" : "events"}` : null,
+            taskCount ? `${taskCount} ${taskCount === 1 ? "task" : "tasks"} due` : null,
+          ]
+            .filter(Boolean)
+            .join(", ")
           return (
             <div
               key={ds}
@@ -75,7 +90,7 @@ export function MonthView({
                   e.stopPropagation()
                   onSelectDay(day)
                 }}
-                aria-label={`${format(day, "EEEE, MMMM d")}${dayOccs.length ? `, ${dayOccs.length} ${dayOccs.length === 1 ? "event" : "events"}` : ""}`}
+                aria-label={label}
                 aria-pressed={selected}
                 className={cn(
                   "mx-auto flex size-8 items-center justify-center rounded-full text-sm tabular-nums transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 sm:mx-0",
@@ -88,11 +103,12 @@ export function MonthView({
               </button>
 
               {/* Mobile: dots */}
-              {dayOccs.length ? (
-                <div className="flex justify-center gap-0.5 sm:hidden" aria-hidden>
+              {dayOccs.length || taskCount ? (
+                <div className="flex items-center justify-center gap-0.5 sm:hidden" aria-hidden>
                   {dayOccs.slice(0, 3).map((o) => (
                     <span key={o.key} className={cn("size-1.5 rounded-full", colorClasses(o.event.color).swatch)} />
                   ))}
+                  {taskCount ? <SquareCheck className="size-2.5 text-muted-foreground" /> : null}
                 </div>
               ) : null}
 
@@ -112,13 +128,15 @@ export function MonthView({
                         className={cn(
                           "flex w-full items-center gap-1 truncate rounded-md px-1.5 py-0.5 text-left text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           c.soft,
-                          c.softHover
+                          c.softHover,
+                          highlightId === o.event.id && "ring-2 ring-primary"
                         )}
                       >
                         {!o.event.allDay && isSameDay(o.start, day) ? (
                           <span className="shrink-0 opacity-75 tabular-nums">{format(o.start, o.start.getMinutes() ? "h:mm" : "h a")}</span>
                         ) : null}
                         <span className="truncate">{o.event.title}</span>
+                        {hasAlert(o.event.alertMinutes) ? <><Bell className="ml-auto size-3 shrink-0 opacity-70" aria-hidden /><span className="sr-only">, has alert</span></> : null}
                       </button>
                     </li>
                   )
@@ -135,6 +153,14 @@ export function MonthView({
                     >
                       +{extra} more
                     </button>
+                  </li>
+                ) : null}
+                {taskCount ? (
+                  <li className="flex items-center gap-1 px-1.5 text-xs text-muted-foreground" aria-hidden>
+                    <SquareCheck className="size-3 shrink-0" />
+                    <span className="truncate">
+                      {taskCount} {taskCount === 1 ? "task" : "tasks"}
+                    </span>
                   </li>
                 ) : null}
               </ul>

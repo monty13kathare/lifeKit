@@ -1,4 +1,5 @@
 import { todayString } from "@/lib/dates"
+import { uploadToCloudRelay, buildPublicShareUrl } from "./cloud-relay"
 import {
   PACKAGE_EXTENSION,
   PBKDF2_ITERATIONS,
@@ -41,13 +42,13 @@ function infoFrom(header: PackageHeader, encryptedSize: number, now = Date.now()
 }
 
 /**
- * Browser-only implementation: AES-256-GCM encryption with a key derived from
- * the password (PBKDF2-SHA256) or a random 256-bit share key. Produces a file
- * the user sends themselves; it never creates public links.
+ * Browser-first zero-knowledge implementation: AES-256-GCM encryption with a key
+ * derived from the password (PBKDF2-SHA256) or a random 256-bit share key.
+ * Files are encrypted in-memory before upload, generating end-to-end secure public links.
  */
 export class LocalShareService implements ShareService {
   readonly kind = "local" as const
-  readonly createsPublicLinks = false
+  readonly createsPublicLinks = true
 
   static isSupported(): boolean {
     return typeof crypto !== "undefined" && typeof crypto.subtle?.encrypt === "function"
@@ -105,7 +106,20 @@ export class LocalShareService implements ShareService {
 
     // Neutral file name: the real names are inside the encrypted part.
     const suffix = base64url.encode(randomBytes(3))
-    const pkg = buildPackage(headerBytes, ciphertext, `secure-share-${todayString()}-${suffix}${PACKAGE_EXTENSION}`)
+    const pkgName = `secure-share-${todayString()}-${suffix}${PACKAGE_EXTENSION}`
+    const pkg = buildPackage(headerBytes, ciphertext, pkgName)
+
+    let publicUrl: string | null = null
+    let publiclyAccessible = false
+
+    // If public link mode is requested (default), upload encrypted blob to zero-knowledge cloud relay
+    if (options.isPublicLink !== false) {
+      stage("uploading")
+      const cloudRes = await uploadToCloudRelay(pkg, pkgName)
+      publicUrl = buildPublicShareUrl(cloudRes.downloadUrl, shareKey, !!options.password)
+      publiclyAccessible = true
+    }
+
     stage("done")
 
     return {
@@ -116,8 +130,8 @@ export class LocalShareService implements ShareService {
       allowDownload: header.allowDownload,
       fileCount: files.length,
       localUrl: URL.createObjectURL(pkg),
-      publicUrl: null,
-      publiclyAccessible: false,
+      publicUrl,
+      publiclyAccessible,
     }
   }
 

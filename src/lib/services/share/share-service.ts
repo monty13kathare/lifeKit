@@ -14,11 +14,13 @@ export interface ShareOptions {
   allowDownload: boolean
   /** Private note, encrypted together with the files. */
   notes?: string
+  /** Whether to upload the encrypted package to generate a public cloud link. */
+  isPublicLink?: boolean
   /** Progress callback for long operations. */
   onStage?: (stage: ShareStage) => void
 }
 
-export type ShareStage = "reading" | "deriving-key" | "encrypting" | "decrypting" | "done"
+export type ShareStage = "reading" | "deriving-key" | "encrypting" | "decrypting" | "uploading" | "downloading" | "done"
 
 export type ShareProtection = "password" | "key"
 

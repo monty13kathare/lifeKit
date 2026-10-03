@@ -16,12 +16,19 @@ import {
   type ImageAnnotation,
   type PageNumberSettings,
   type TextAnnotation,
+  type TextReplaceAnnotation,
   type WatermarkSettings,
 } from "@/lib/pdf/edit"
 import { cn } from "@/lib/utils"
 import { capScale, renderPage } from "./pdf-render"
 import { uid, type ApplyOptions, type DocState } from "./use-editor-state"
 import type { Tool, ToolSettings } from "./types"
+import {
+  extractPageTextItems,
+  sampleColorsFromCanvas,
+  type ExtractedTextItem,
+} from "./text-replace-helper"
+import { TextReplaceModal, type TextReplaceValues } from "./text-replace-modal"
 
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n))
 
@@ -101,6 +108,152 @@ export function PageCanvas(props: PageCanvasProps) {
   const [VW, VH] = visualSize(page)
   const rot = page.rotation
 
+  // ---- Text Layer & Replacement State -----------------------------------
+  const [textItems, setTextItems] = useState<ExtractedTextItem[]>([])
+  type ModalTarget =
+    | {
+        mode: "create"
+        item: ExtractedTextItem
+        originalText: string
+        initialValues: TextReplaceValues
+      }
+    | {
+        mode: "edit"
+        annotation: TextReplaceAnnotation
+        originalText: string
+        initialValues: TextReplaceValues
+      }
+    | null
+
+  const [modalTarget, setModalTarget] = useState<ModalTarget>(null)
+
+  useEffect(() => {
+    let active = true
+    pdf.getPage(page.srcIndex + 1)
+      .then((p) => p.getTextContent())
+      .then((tc) => {
+        if (!active) return
+        setTextItems(extractPageTextItems(tc, W, H))
+      })
+      .catch((err) => console.error("[PDF Text Layer Extraction Error]", err))
+    return () => {
+      active = false
+    }
+  }, [pdf, page.srcIndex, W, H])
+
+  const handleTextItemClick = (e: React.MouseEvent, item: ExtractedTextItem) => {
+    e.stopPropagation()
+    const canvas = hostRef.current?.querySelector("canvas") || null
+    const colors = sampleColorsFromCanvas(canvas, item.x, item.y, item.w, item.h)
+
+    setModalTarget({
+      mode: "create",
+      item,
+      originalText: item.str,
+      initialValues: {
+        text: item.str,
+        fontSize: item.fontSize,
+        fontFamily: item.fontFamily,
+        fontWeight: item.fontWeight,
+        textColor: colors.textColor,
+        bgColor: colors.bgColor,
+      },
+    })
+  }
+
+  const handleEditExistingReplace = (a: TextReplaceAnnotation) => {
+    onSelect(a.id)
+    setModalTarget({
+      mode: "edit",
+      annotation: a,
+      originalText: a.originalText || a.text,
+      initialValues: {
+        text: a.text,
+        fontSize: a.fontSize,
+        fontFamily: a.fontFamily,
+        fontWeight: a.fontWeight,
+        textColor: a.color,
+        bgColor: a.bgColor,
+      },
+    })
+  }
+
+  // Automatically open modal if an existing text-replace annotation is targeted for editing
+  useEffect(() => {
+    if (!editingId) return
+    const a = annotations.find((x) => x.id === editingId && x.type === "text-replace") as TextReplaceAnnotation | undefined
+    if (a) {
+      handleEditExistingReplace(a)
+    }
+  }, [editingId, annotations])
+
+  const handleApplyReplace = (values: TextReplaceValues) => {
+    if (!modalTarget) return
+
+    if (modalTarget.mode === "create") {
+      const lenRatio = values.text.length / Math.max(1, modalTarget.originalText.length)
+      const w = Math.min(1 - modalTarget.item.x, Math.max(modalTarget.item.w, modalTarget.item.w * lenRatio))
+
+      const a: TextReplaceAnnotation = {
+        id: uid("ann"),
+        type: "text-replace",
+        x: modalTarget.item.x,
+        y: modalTarget.item.y,
+        w,
+        h: modalTarget.item.h,
+        baselineY: modalTarget.item.baselineY,
+        text: values.text,
+        originalText: modalTarget.originalText,
+        fontSize: values.fontSize,
+        fontFamily: values.fontFamily,
+        fontWeight: values.fontWeight,
+        color: values.textColor,
+        bgColor: values.bgColor,
+        rotation: 0,
+      }
+      onAdd(a)
+      onSelect(a.id)
+    } else {
+      onUpdate(modalTarget.annotation.id, {
+        text: values.text,
+        fontSize: values.fontSize,
+        fontFamily: values.fontFamily,
+        fontWeight: values.fontWeight,
+        color: values.textColor,
+        bgColor: values.bgColor,
+      })
+    }
+  }
+
+  const handleEraseReplace = () => {
+    if (!modalTarget) return
+    if (modalTarget.mode === "create") {
+      const a: TextReplaceAnnotation = {
+        id: uid("ann"),
+        type: "text-replace",
+        x: modalTarget.item.x,
+        y: modalTarget.item.y,
+        w: modalTarget.item.w,
+        h: modalTarget.item.h,
+        baselineY: modalTarget.item.baselineY,
+        text: "",
+        originalText: modalTarget.originalText,
+        fontSize: modalTarget.item.fontSize,
+        fontFamily: modalTarget.item.fontFamily,
+        fontWeight: modalTarget.item.fontWeight,
+        color: "#ffffff",
+        bgColor: modalTarget.initialValues.bgColor || "#ffffff",
+        rotation: 0,
+      }
+      onAdd(a)
+      onSelect(a.id)
+    } else {
+      onUpdate(modalTarget.annotation.id, {
+        text: "",
+      })
+    }
+  }
+
   // ---- Render the (unrotated) page bitmap -------------------------------
   useEffect(() => {
     let job: ReturnType<typeof renderPage> | null = null
@@ -163,6 +316,8 @@ export function PageCanvas(props: PageCanvasProps) {
       }
       case "highlight":
         return { x: clamp(a.x + dx, 0, 1 - a.w), y: clamp(a.y + dy, 0, 1 - a.h) }
+      case "text-replace":
+        return { x: clamp(a.x + dx, 0, 1 - a.w), y: clamp(a.y + dy, 0, 1 - a.h) }
       default:
         return { x: clamp(a.x + dx, 0, 1), y: clamp(a.y + dy, 0, 1) }
     }
@@ -207,7 +362,7 @@ export function PageCanvas(props: PageCanvasProps) {
       onFinishEditing()
       if (tool !== "draw" && tool !== "highlight") return
     }
-    if (tool === "select") {
+    if (tool === "select" || tool === "edit-text") {
       onSelect(null)
       return
     }
@@ -322,17 +477,24 @@ export function PageCanvas(props: PageCanvasProps) {
       e.preventDefault()
       e.stopPropagation()
       onRemove(a.id)
-    } else if (e.key === "Enter" && a.type === "text") {
+    } else if (e.key === "Enter" && (a.type === "text" || a.type === "text-replace")) {
       e.preventDefault()
-      onSelect(a.id)
-      onStartEditing(a.id)
+      if (a.type === "text-replace") {
+        handleEditExistingReplace(a)
+      } else {
+        onSelect(a.id)
+        onStartEditing(a.id)
+      }
     } else if (e.key === "Escape") {
       onSelect(null)
     }
   }
 
   // ---- Rendering --------------------------------------------------------------
-  const interactive = (a: Annotation) => tool === "select" || (tool === "text" && a.type === "text")
+  const interactive = (a: Annotation) =>
+    tool === "select" ||
+    tool === "edit-text" ||
+    (tool === "text" && a.type === "text")
   const annotationA11y = (a: Annotation, label: string) => ({
     tabIndex: interactive(a) ? 0 : -1,
     role: "button" as const,
@@ -345,7 +507,10 @@ export function PageCanvas(props: PageCanvasProps) {
   })
 
   const vectorItems = annotations.filter((a) => a.type === "ink" || a.type === "highlight")
-  const boxItems = annotations.filter((a): a is TextAnnotation | ImageAnnotation => a.type === "text" || a.type === "image")
+  const boxItems = annotations.filter(
+    (a): a is TextAnnotation | ImageAnnotation | TextReplaceAnnotation =>
+      a.type === "text" || a.type === "image" || a.type === "text-replace"
+  )
   const draftRect =
     draft?.kind === "highlight"
       ? {
@@ -378,7 +543,7 @@ export function PageCanvas(props: PageCanvasProps) {
       onPointerCancel={(e) => endPointer(e, true)}
       onMouseDown={(e) => {
         const t = e.target as HTMLElement
-        if (t.tagName !== "TEXTAREA") e.preventDefault()
+        if (t.tagName !== "TEXTAREA" && !t.closest(".pdf-text-layer")) e.preventDefault()
       }}
       aria-label={`Page ${pageIndex + 1} of ${pageCount}`}
       role="group"
@@ -547,6 +712,51 @@ export function PageCanvas(props: PageCanvasProps) {
               </div>
             )
           }
+          if (a.type === "text-replace") {
+            const fontCss =
+              a.fontFamily === "serif"
+                ? "'Times New Roman', Times, Georgia, serif"
+                : a.fontFamily === "mono"
+                  ? "'Courier New', Courier, monospace"
+                  : PDF_FONT_STACK
+            const isMultiLine = a.text.includes("\n")
+            return (
+              <div
+                key={a.id}
+                {...common}
+                {...annotationA11y(a, `Replaced text: ${a.text || a.originalText || "empty"}`)}
+                onDoubleClick={() => handleEditExistingReplace(a)}
+                style={{
+                  ...common.style,
+                  width: `${a.w * 100}%`,
+                  height: isMultiLine ? undefined : `${a.h * 100}%`,
+                  minHeight: `${a.h * 100}%`,
+                }}
+                title="Replaced text. Double-click to edit."
+              >
+                {/* 1. Solid background cover that completely erases original text on the canvas */}
+                <div
+                  className="absolute inset-[-2px] rounded-[1px] pointer-events-none"
+                  style={{ backgroundColor: a.bgColor || "#ffffff" }}
+                />
+
+                {/* 2. Replacement text rendered seamlessly on top with matching font and color */}
+                <span
+                  className={cn("relative block select-text", isMultiLine ? "whitespace-pre-wrap" : "whitespace-nowrap")}
+                  style={{
+                    fontSize: `${a.fontSize * scale}px`,
+                    lineHeight: isMultiLine ? TEXT_LINE_HEIGHT : `${a.h * H * scale}px`,
+                    color: a.color,
+                    fontFamily: fontCss,
+                    fontWeight: a.fontWeight === "bold" ? "bold" : "normal",
+                  }}
+                >
+                  {a.text || " "}
+                </span>
+              </div>
+            )
+          }
+
           const editing = editingId === a.id
           return (
             <div
@@ -577,6 +787,37 @@ export function PageCanvas(props: PageCanvasProps) {
             </div>
           )
         })}
+
+        {/* Interactive PDF Text Layer for selecting/editing any existing text */}
+        {(tool === "select" || tool === "edit-text") && (
+          <div className="pdf-text-layer absolute inset-0 select-text pointer-events-none">
+            {textItems.map((item) => (
+              <span
+                key={item.id}
+                className={cn(
+                  "absolute pointer-events-auto cursor-pointer rounded-[2px] transition-all",
+                  tool === "edit-text"
+                    ? "hover:bg-primary/20 hover:ring-1 hover:ring-primary/60 hover:shadow-xs"
+                    : "hover:bg-primary/10 hover:ring-1 hover:ring-primary/30"
+                )}
+                style={{
+                  left: `${item.x * 100}%`,
+                  top: `${item.y * 100}%`,
+                  width: `${item.w * 100}%`,
+                  height: `${item.h * 100}%`,
+                  fontSize: `${item.fontSize * scale}px`,
+                  lineHeight: 1,
+                  color: "transparent",
+                }}
+                title={`Click to edit or replace: "${item.str}"`}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => handleTextItemClick(e, item)}
+              >
+                {item.str}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Document-wide previews, drawn in the visual frame */}
@@ -631,6 +872,19 @@ export function PageCanvas(props: PageCanvasProps) {
             </span>
           )}
         </div>
+      )}
+      {modalTarget && (
+        <TextReplaceModal
+          open={modalTarget !== null}
+          onClose={() => {
+            setModalTarget(null)
+            onFinishEditing()
+          }}
+          originalText={modalTarget.originalText}
+          initialValues={modalTarget.initialValues}
+          onApply={handleApplyReplace}
+          onErase={handleEraseReplace}
+        />
       )}
     </div>
   )

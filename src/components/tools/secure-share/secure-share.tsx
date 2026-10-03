@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { FileLock2, LockOpen } from "lucide-react"
 import { Notice, UnsupportedNotice } from "@/components/common/notice"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -16,6 +16,14 @@ export function SecureShare() {
   const hydrated = useHydrated()
   const [tab, setTab] = useState<Tab>("create")
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get("pkg")) {
+      setTab("open")
+    }
+  }, [])
+
   if (!hydrated) return <Skeleton className="h-96 rounded-2xl" />
 
   if (!LocalShareService.isSupported()) {
@@ -29,18 +37,19 @@ export function SecureShare() {
 
   return (
     <div className="space-y-4">
-      <Notice tone="info" title="No backend in this version: LifeKit does not create public internet links. Your file is encrypted in your browser.">
-        SecureShare turns your files into an encrypted <code>.lifekit</code> package (AES-256-GCM). You send the package yourself — by
-        email, chat or the share sheet — and the recipient opens it here with the password or share key.
+      <Notice tone="info" title="End-to-End Encrypted File Sharing (Zero-Knowledge AES-256-GCM)">
+        Files are packed and encrypted directly inside your browser before anything leaves your device.
+        When you generate a public link, only the encrypted package is uploaded. The decryption key stays
+        in the link URL hash and is never transmitted to any server.
       </Notice>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList className="w-full sm:w-auto">
           <TabsTrigger value="create" className="px-4">
-            <FileLock2 aria-hidden /> Create package
+            <FileLock2 aria-hidden /> Create & share
           </TabsTrigger>
           <TabsTrigger value="open" className="px-4">
-            <LockOpen aria-hidden /> Open a package
+            <LockOpen aria-hidden /> Open shared files
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -55,3 +64,4 @@ export function SecureShare() {
     </div>
   )
 }
+

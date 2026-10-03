@@ -42,7 +42,7 @@ export function ToolPage({
 }: ToolPageProps) {
   const tool = getTool(toolId)
   const Icon = tool.icon
-  const back = backHref ?? (tool.section === "life" ? "/my-life" : "/tools")
+  const back = backHref ?? (tool.section === "life" ? "/my-life" : tool.section === "learn" ? "/learn" : "/tools")
   return (
     <div className={cn("mx-auto w-full", widths[width], className)}>
       <header className="mb-5 flex items-start gap-3 sm:mb-6 sm:gap-4">

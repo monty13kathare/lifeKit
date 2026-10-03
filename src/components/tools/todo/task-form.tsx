@@ -15,6 +15,7 @@ import { FormField } from "@/components/tools/calendar/form-field"
 import { createId } from "@/lib/storage/core"
 import { cn } from "@/lib/utils"
 import type { Subtask, Task, TaskPriority } from "@/types"
+import { BreakDownButton, SubtaskSuggestionList, useSubtaskSuggestions } from "./ai-subtasks"
 import { PRESET_CATEGORIES, PRIORITY_META, RECURRENCE_LABEL } from "./task-utils"
 
 const schema = z
@@ -48,6 +49,8 @@ interface TaskFormSheetProps {
   categories: string[]
   onSubmit: (draft: TaskDraft) => void
   onDelete?: (task: Task) => void
+  /** Show Gemini-powered helpers (only when AI is configured). */
+  aiEnabled?: boolean
 }
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high"]
@@ -94,9 +97,12 @@ function FormFooter({ task, onOpenChange, onDelete }: TaskFormSheetProps) {
   )
 }
 
-function TaskForm({ task, defaults, categories, onSubmit }: TaskFormSheetProps) {
+function TaskForm({ task, defaults, categories, onSubmit, aiEnabled }: TaskFormSheetProps) {
   const initial = task ?? defaults
-  const [subtasks, setSubtasks] = useState<Subtask[]>(task?.subtasks ?? [])
+  const [subtasks, setSubtasks] = useState<Subtask[]>(
+    () => task?.subtasks ?? (defaults?.subtasks ?? []).map((s) => ({ ...s, id: s.id || createId() }))
+  )
+  const suggestions = useSubtaskSuggestions()
   const [subDraft, setSubDraft] = useState("")
   const initialCategory = initial?.category ?? "Personal"
   const allCategories = Array.from(new Set([...PRESET_CATEGORIES, ...categories, initialCategory]))
@@ -108,7 +114,7 @@ function TaskForm({ task, defaults, categories, onSubmit }: TaskFormSheetProps) 
     control,
     handleSubmit,
     setValue,
-
+    getValues,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -125,6 +131,14 @@ function TaskForm({ task, defaults, categories, onSubmit }: TaskFormSheetProps) 
 
   const category = useWatch({ control, name: "category" })
   const dueDate = useWatch({ control, name: "dueDate" })
+  const title = useWatch({ control, name: "title" })
+
+  const addSuggested = () => {
+    const titles = suggestions.selectedTitles
+    if (!titles.length) return
+    setSubtasks((s) => [...s, ...titles.map((t) => ({ id: createId(), title: t, done: false }))])
+    suggestions.cancel()
+  }
 
   const addSub = () => {
     const title = subDraft.trim()
@@ -276,14 +290,38 @@ function TaskForm({ task, defaults, categories, onSubmit }: TaskFormSheetProps) 
       </FormField>
 
       <div>
-        <p className="mb-1.5 text-sm font-medium">
-          Subtasks{" "}
-          {subtasks.length ? (
-            <span className="font-normal text-muted-foreground">
-              ({subtasks.filter((s) => s.done).length}/{subtasks.length})
-            </span>
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium">
+            Subtasks{" "}
+            {subtasks.length ? (
+              <span className="font-normal text-muted-foreground">
+                ({subtasks.filter((s) => s.done).length}/{subtasks.length})
+              </span>
+            ) : null}
+          </p>
+          {aiEnabled && !suggestions.items ? (
+            <BreakDownButton
+              loading={suggestions.loading}
+              disabled={!title?.trim()}
+              onClick={() => void suggestions.run(getValues("title"), getValues("notes"))}
+            />
           ) : null}
-        </p>
+        </div>
+        {aiEnabled && (suggestions.loading || suggestions.items) ? (
+          <div className="mb-3 rounded-xl border border-dashed p-2.5">
+            <SubtaskSuggestionList s={suggestions} />
+            <div className="mt-2 flex justify-end gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={suggestions.cancel}>
+                {suggestions.loading ? "Cancel" : "Dismiss"}
+              </Button>
+              {suggestions.items ? (
+                <Button type="button" size="sm" onClick={addSuggested} disabled={!suggestions.selectedTitles.length}>
+                  Add selected
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         {subtasks.length ? (
           <ul className="mb-2 space-y-1" aria-label="Subtasks">
             {subtasks.map((s) => (

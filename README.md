@@ -14,6 +14,29 @@ npm run build && npm start   # production build (registers the service worker)
 
 Camera, microphone and installation need a secure context. That means `localhost`, or HTTPS when testing on a phone (for example via a tunnel).
 
+## AI with Google Gemini (optional)
+
+1. Get an API key at [Google AI Studio](https://aistudio.google.com/apikey).
+2. Put it in `.env` (git-ignored; see `.env.example`):
+   ```bash
+   GEMINI_API_KEY=your-key-here
+   # GEMINI_MODEL=gemini-3.8-flash   # optional, defaults to gemini-3.5-flash-lite
+   ```
+3. Restart `npm run dev`.
+
+With a key set:
+- **AI Productivity** tools come alive: AI Writer (draft, rewrite, reply, translate), Summarizer, Goal Planner and Decision Helper
+- **My Life** gains natural-language quick add in Tasks, Calendar and Reminders, AI subtasks, routine generation, "extract tasks" from notes, Quick capture and a "Plan my day" briefing
+- **Learn Skills** unlocks AI grading in the Prompt Lab, the English writing coach and generated logic puzzles
+- an **AI assist** menu (Summarize, Fix spelling & grammar, Bullet points, Simplify) appears in OCR and Notes
+
+Without a key, these features stay hidden and the app works as before.
+
+How the key is protected:
+- It stays on the server. The browser only calls this app's own routes (`/api/ai/status`, `/api/ai/text`, `/api/ai/assist`), and the server code is marked `server-only`.
+- The routes accept same-origin requests only, are rate-limited (20 per minute per IP, per server instance), validate their input and cap text size.
+- AI features need a running Next.js server (`npm start`, Vercel, …). A purely static host serves the app without them.
+
 ## Features
 
 | Area | Tools |
@@ -21,10 +44,11 @@ Camera, microphone and installation need a secure context. That means `localhost
 | Documents | Image to PDF, PDF Editor (reorder, rotate, delete, text, draw, highlight, signature, watermark, page numbers), PDF Scanner (detect, crop, perspective-correct, enhance), OCR |
 | Images | Resize (presets), Compress (batch, target size), Convert (JPG/PNG/WebP, and AVIF where supported) |
 | Scan | Scan Everything, QR Scanner (URL safety warnings), Barcode Scanner, QR Generator (PNG/SVG, logo) |
-| Communication | Voice to Text, Text to Voice, Translator (pluggable provider, with a demo dictionary built in) |
+| AI Productivity | AI Writer, Summarizer, Goal Planner (milestones → Tasks), Decision Helper (weighted matrix + AI advice) |
 | Finance | Smart Calculator (natural input like `20% of 15000`, no `eval`), EMI (prepayment, comparison), GST, Percentage, Unit Converter |
 | Security | Password Generator (crypto-strong, never stored), SecureShare (AES-GCM encrypted packages) |
-| My Life | Tasks, Daily Routine, Calendar (month/week/day/agenda), Reminders, Notes, Wellness, Bookmarks, Important Info (optional passphrase encryption) |
+| My Life | Quick capture, Up next, Plan my day, Tasks, Daily Routine, Calendar (with alerts), Reminders, Focus Timer (Pomodoro), Notes, Wellness, Bookmarks, Important Info (optional passphrase encryption) |
+| Learn Skills | AI Prompting (lessons, Prompt Lab, quiz, templates), English (flashcards with spaced repetition, grammar, writing coach, speaking), Logic (daily puzzle, puzzle bank, mental maths, patterns, thinking skills), with XP, levels and streaks |
 
 ## Architecture
 
@@ -53,11 +77,11 @@ src/
 
 See `AGENTS.md` for coding conventions, including the Base UI differences from Radix-era shadcn.
 
-## Honest limitations (frontend-only)
+## Honest limitations
 
 - **Sharing.** SecureShare and the file-type QR codes do not create public internet links. Any local links are labelled as working only in this browser.
 - **Reminders.** They fire while LifeKit is open. Without a push server, closed apps may not get notifications.
-- **Translation.** The built-in mode is a demo dictionary. Full translation needs a backend proxy (`NEXT_PUBLIC_TRANSLATION_ENDPOINT`).
+- **AI features.** Without `GEMINI_API_KEY`, AI controls are hidden (AI Writer and Summarizer explain that they need a key) and everything else works offline. With a key, only the text you submit to an AI feature is sent to Google's Gemini API.
 - **Speech recognition.** Availability depends on the browser. Chrome processes audio through Google's speech service.
 - **OCR.** Language data downloads once from a CDN. Images never leave the device.
 - **Storage.** Local storage is not a secure vault. Use the encryption option for sensitive details.
