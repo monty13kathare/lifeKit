@@ -1,16 +1,22 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { format as formatDate } from "date-fns"
 import { motion } from "framer-motion"
 import {
+  CalendarPlus,
   Contact,
   Download,
+  ExternalLink,
   Eye,
   EyeOff,
+  IndianRupee,
   Info,
   Link as LinkIcon,
   Mail,
+  Map as MapIcon,
   MapPin,
+  MessageCircle,
   MessageSquare,
   Phone,
   TriangleAlert,
@@ -25,7 +31,9 @@ import { CopyButton } from "@/components/common/copy-button"
 import { downloadText } from "@/lib/files"
 import type { DetectedCode } from "@/lib/qr/detect"
 import { formatLabel, is2D, productHints } from "@/lib/qr/formats"
-import { PAYLOAD_LABELS, parsePayload, type Payload } from "@/lib/qr/payload"
+import { UPI_VPA_RE } from "@/lib/qr/generator"
+import { PAYLOAD_LABELS, parsePayload, type EventPayload, type IcsDate, type Payload } from "@/lib/qr/payload"
+import { openExternal } from "@/lib/qr/url-safety"
 import { cn } from "@/lib/utils"
 import { ShareButton } from "./share-button"
 import { UrlPreview } from "./url-preview"
@@ -34,6 +42,9 @@ const ICONS: Record<Payload["type"], LucideIcon> = {
   url: LinkIcon,
   wifi: Wifi,
   contact: Contact,
+  event: CalendarPlus,
+  upi: IndianRupee,
+  whatsapp: MessageCircle,
   email: Mail,
   phone: Phone,
   sms: MessageSquare,
@@ -49,7 +60,7 @@ function Field({ label, value, copy, mono }: { label: string; value?: string; co
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className={cn("text-sm wrap-break-word whitespace-pre-wrap", mono && "font-mono")}>{value}</p>
       </div>
-      {copy ? <CopyButton value={value} iconOnly size="icon-sm" variant="ghost" label={`Copy ${label.toLowerCase()}`} /> : null}
+      {copy ? <CopyButton value={value} iconOnly variant="ghost" label={`Copy ${label.toLowerCase()}`} /> : null}
     </div>
   )
 }
@@ -62,18 +73,22 @@ function PasswordField({ value }: { value: string }) {
         <p className="text-xs text-muted-foreground">Password</p>
         <p className="font-mono text-sm break-all">{show ? value : "•".repeat(Math.min(value.length, 16))}</p>
       </div>
-      <div className="flex shrink-0 gap-1">
-        <Button size="icon-sm" variant="ghost" aria-label={show ? "Hide password" : "Show password"} aria-pressed={show} onClick={() => setShow((s) => !s)}>
-          {show ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
-        </Button>
-        <CopyButton value={value} iconOnly size="icon-sm" variant="ghost" label="Copy password" />
-      </div>
+      <Button size="icon" variant="ghost" aria-label={show ? "Hide password" : "Show password"} aria-pressed={show} onClick={() => setShow((s) => !s)}>
+        {show ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+      </Button>
     </div>
   )
 }
 
+/** Big, thumb-friendly action row: full width on phones, inline on larger screens. */
+function Actions({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 sm:flex sm:flex-wrap *:w-full sm:*:w-auto">{children}</div>
+}
+
 const linkBtn =
-  "inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-3.5 text-sm font-medium hover:bg-muted dark:border-input dark:bg-input/30 [&_svg]:size-4"
+  "inline-flex h-11 items-center justify-center gap-1.5 rounded-lg border border-border bg-background px-4 text-sm font-medium hover:bg-muted dark:border-input dark:bg-input/30 [&_svg]:size-4"
+const primaryLinkBtn =
+  "inline-flex h-11 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 [&_svg]:size-4"
 
 function mailtoHref(to: string, subject?: string, body?: string) {
   const params: string[] = []
@@ -81,6 +96,30 @@ function mailtoHref(to: string, subject?: string, body?: string) {
   if (body) params.push(`body=${encodeURIComponent(body)}`)
   return `mailto:${to.replace(/[^\w.@+,-]/g, "")}${params.length ? `?${params.join("&")}` : ""}`
 }
+
+const telHref = (n: string) => `tel:${n.replace(/[^\d+*#,;]/g, "")}`
+
+function fmtIcs(d: IcsDate, withDate = true) {
+  if (d.allDay) return formatDate(d.date, "EEE, d MMM yyyy")
+  return formatDate(d.date, withDate ? "EEE, d MMM yyyy, h:mm a" : "h:mm a")
+}
+
+function eventWhen(e: EventPayload): string | undefined {
+  const { start, end } = e
+  if (!start) return undefined
+  if (start.allDay) {
+    // DTEND for all-day events is exclusive.
+    const last = end ? new Date(end.date.getFullYear(), end.date.getMonth(), end.date.getDate() - 1) : start.date
+    const sameDay = last.toDateString() === start.date.toDateString() || last < start.date
+    return sameDay ? `${fmtIcs(start)} · all day` : `${fmtIcs(start)} – ${formatDate(last, "EEE, d MMM yyyy")} · all day`
+  }
+  const tz = start.utc ? " (your time)" : ""
+  if (!end) return fmtIcs(start) + tz
+  const sameDay = end.date.toDateString() === start.date.toDateString()
+  return `${fmtIcs(start)} – ${fmtIcs(end, !sameDay)}${tz}`
+}
+
+const fileName = (s: string, ext: string) => `${(s || "scan").trim().replace(/[^\w.-]+/g, "_").slice(0, 60) || "scan"}.${ext}`
 
 /** Structured, text-only rendering of a decoded payload. */
 export function PayloadView({ payload, raw }: { payload: Payload; raw: string }) {
@@ -96,8 +135,13 @@ export function PayloadView({ payload, raw }: { payload: Payload; raw: string })
             <Field label="Security" value={payload.encryption} />
             {payload.hidden ? <Field label="Visibility" value="Hidden network" /> : null}
           </div>
+          <Actions>
+            {payload.password ? <CopyButton value={payload.password} label="Copy password" size="lg" variant="default" /> : null}
+            {payload.ssid ? <CopyButton value={payload.ssid} label="Copy network name" size="lg" /> : null}
+          </Actions>
           <p className="text-xs text-muted-foreground">
-            Browsers can&apos;t join Wi-Fi networks directly. Copy the password and pick “{payload.ssid}” in your device&apos;s Wi-Fi settings.
+            Websites can&apos;t join Wi-Fi for you. Copy the password, then pick “{payload.ssid}” in your device&apos;s Wi-Fi settings. (Your phone&apos;s own
+            camera app can join directly from this code.)
           </p>
         </div>
       )
@@ -108,7 +152,7 @@ export function PayloadView({ payload, raw }: { payload: Payload; raw: string })
             <Field label="Name" value={payload.name} copy />
             <Field label="Organisation" value={[payload.title, payload.org].filter(Boolean).join(" · ")} />
             {payload.phones.map((p, i) => (
-              <Field key={`p${i}`} label="Phone" value={p} copy />
+              <Field key={`p${i}`} label="Phone" value={p} copy mono />
             ))}
             {payload.emails.map((e, i) => (
               <Field key={`e${i}`} label="Email" value={e} copy />
@@ -119,12 +163,91 @@ export function PayloadView({ payload, raw }: { payload: Payload; raw: string })
             <Field label="Address" value={payload.address} copy />
             <Field label="Note" value={payload.note} />
           </div>
-          <Button
-            variant="outline"
-            onClick={() => downloadText(payload.vcf, `${(payload.name || "contact").replace(/[^\w.-]+/g, "_")}.vcf`, "text/vcard;charset=utf-8")}
-          >
-            <Download aria-hidden /> Download contact .vcf
-          </Button>
+          <Actions>
+            <Button size="lg" onClick={() => downloadText(payload.vcf, fileName(payload.name || "contact", "vcf"), "text/vcard;charset=utf-8")}>
+              <Download aria-hidden /> Save contact (.vcf)
+            </Button>
+            {payload.phones[0] ? (
+              <a className={linkBtn} href={telHref(payload.phones[0])}>
+                <Phone aria-hidden /> Call
+              </a>
+            ) : null}
+            {payload.emails[0] ? (
+              <a className={linkBtn} href={mailtoHref(payload.emails[0])}>
+                <Mail aria-hidden /> Email
+              </a>
+            ) : null}
+          </Actions>
+        </div>
+      )
+    case "event": {
+      const when = eventWhen(payload)
+      return (
+        <div className="space-y-3">
+          <div className="rounded-xl border bg-surface px-3">
+            <Field label="Event" value={payload.summary || "(untitled)"} copy={!!payload.summary} />
+            <Field label="When" value={when ?? "No date in this code"} />
+            <Field label="Where" value={payload.location} copy />
+            <Field label="Details" value={payload.description} />
+          </div>
+          <Actions>
+            <Button size="lg" onClick={() => downloadText(payload.ics, fileName(payload.summary || "event", "ics"), "text/calendar;charset=utf-8")}>
+              <CalendarPlus aria-hidden /> Add to calendar (.ics)
+            </Button>
+          </Actions>
+          <p className="text-xs text-muted-foreground">Open the downloaded .ics file to add it to Google Calendar, Apple Calendar or Outlook.</p>
+        </div>
+      )
+    }
+    case "upi": {
+      const validVpa = UPI_VPA_RE.test(payload.vpa)
+      const amount = payload.amount && Number.isFinite(Number(payload.amount)) ? Number(payload.amount) : null
+      return (
+        <div className="space-y-3">
+          <div className="rounded-xl border bg-surface px-3">
+            <Field label="Pay to" value={payload.name || "(name not included)"} />
+            <Field label="UPI ID" value={payload.vpa} copy mono />
+            <Field
+              label="Amount"
+              value={
+                amount !== null
+                  ? `${payload.currency && payload.currency !== "INR" ? `${payload.currency} ` : "₹"}${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                  : "Not set — you'll enter it in your UPI app"
+              }
+            />
+            <Field label="Note" value={payload.note} />
+          </div>
+          {!validVpa ? (
+            <p className="flex gap-2 text-sm text-destructive">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden /> This doesn&apos;t look like a valid UPI ID. Don&apos;t pay unless you trust the source.
+            </p>
+          ) : null}
+          <Actions>
+            {validVpa ? (
+              <a className={primaryLinkBtn} href={payload.url}>
+                <IndianRupee aria-hidden /> Open in UPI app
+              </a>
+            ) : null}
+            <CopyButton value={payload.vpa} label="Copy UPI ID" size="lg" />
+          </Actions>
+          <p className="text-xs text-muted-foreground">
+            Opens GPay, PhonePe, Paytm or your bank&apos;s app on a phone. Always check the payee name in the app before you pay — LifeKit never handles the payment.
+          </p>
+        </div>
+      )
+    }
+    case "whatsapp":
+      return (
+        <div className="space-y-3">
+          <div className="rounded-xl border bg-surface px-3">
+            <Field label="Chat with" value={payload.number ? `+${payload.number}` : "Choose a chat in WhatsApp"} copy={!!payload.number} mono />
+            <Field label="Message" value={payload.text} copy />
+          </div>
+          <Actions>
+            <Button size="lg" onClick={() => openExternal(payload.url)} disabled={!payload.analysis.openable}>
+              <MessageCircle aria-hidden /> Open WhatsApp
+            </Button>
+          </Actions>
         </div>
       )
     case "email":
@@ -136,9 +259,11 @@ export function PayloadView({ payload, raw }: { payload: Payload; raw: string })
             <Field label="Message" value={payload.body} copy />
           </div>
           {payload.to ? (
-            <a className={linkBtn} href={mailtoHref(payload.to, payload.subject, payload.body)}>
-              <Mail aria-hidden /> Compose email
-            </a>
+            <Actions>
+              <a className={primaryLinkBtn} href={mailtoHref(payload.to, payload.subject, payload.body)}>
+                <Mail aria-hidden /> Compose email
+              </a>
+            </Actions>
           ) : null}
         </div>
       )
@@ -148,9 +273,14 @@ export function PayloadView({ payload, raw }: { payload: Payload; raw: string })
           <div className="rounded-xl border bg-surface px-3">
             <Field label="Phone number" value={payload.number} copy mono />
           </div>
-          <a className={linkBtn} href={`tel:${payload.number.replace(/[^\d+*#,;]/g, "")}`}>
-            <Phone aria-hidden /> Call
-          </a>
+          <Actions>
+            <a className={primaryLinkBtn} href={telHref(payload.number)}>
+              <Phone aria-hidden /> Call
+            </a>
+            <a className={linkBtn} href={`sms:${payload.number.replace(/[^\d+]/g, "")}`}>
+              <MessageSquare aria-hidden /> Text
+            </a>
+          </Actions>
         </div>
       )
     case "sms":
@@ -160,12 +290,14 @@ export function PayloadView({ payload, raw }: { payload: Payload; raw: string })
             <Field label="To" value={payload.number} copy mono />
             <Field label="Message" value={payload.body} copy />
           </div>
-          <a
-            className={linkBtn}
-            href={`sms:${payload.number.replace(/[^\d+]/g, "")}${payload.body ? `?body=${encodeURIComponent(payload.body)}` : ""}`}
-          >
-            <MessageSquare aria-hidden /> Open messages
-          </a>
+          <Actions>
+            <a
+              className={primaryLinkBtn}
+              href={`sms:${payload.number.replace(/[^\d+]/g, "")}${payload.body ? `?body=${encodeURIComponent(payload.body)}` : ""}`}
+            >
+              <MessageSquare aria-hidden /> Open messages
+            </a>
+          </Actions>
         </div>
       )
     case "geo":
@@ -175,14 +307,21 @@ export function PayloadView({ payload, raw }: { payload: Payload; raw: string })
             <Field label="Coordinates" value={`${payload.lat}, ${payload.lng}`} copy mono />
             <Field label="Label" value={payload.query} />
           </div>
-          <a
-            className={linkBtn}
-            target="_blank"
-            rel="noopener noreferrer"
-            href={`https://www.openstreetmap.org/?mlat=${payload.lat}&mlon=${payload.lng}#map=16/${payload.lat}/${payload.lng}`}
-          >
-            <MapPin aria-hidden /> Open in OpenStreetMap
-          </a>
+          <Actions>
+            <Button
+              size="lg"
+              onClick={() => openExternal(`https://www.google.com/maps/search/?api=1&query=${payload.lat}%2C${payload.lng}`)}
+            >
+              <MapIcon aria-hidden /> Open in Maps
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => openExternal(`https://www.openstreetmap.org/?mlat=${payload.lat}&mlon=${payload.lng}#map=16/${payload.lat}/${payload.lng}`)}
+            >
+              <ExternalLink aria-hidden /> OpenStreetMap
+            </Button>
+          </Actions>
         </div>
       )
     default:
@@ -228,7 +367,7 @@ export function ScanResultCard({ code, source, onDismiss, className }: ScanResul
           </div>
         </div>
         {onDismiss ? (
-          <Button size="icon-sm" variant="ghost" aria-label="Dismiss result" onClick={onDismiss}>
+          <Button size="icon" variant="ghost" aria-label="Dismiss result" onClick={onDismiss}>
             <X aria-hidden />
           </Button>
         ) : null}
@@ -259,7 +398,7 @@ export function ScanResultCard({ code, source, onDismiss, className }: ScanResul
       ) : null}
 
       <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-        <CopyButton value={code.value} label={payload.type === "url" ? "Copy link" : "Copy"} />
+        <CopyButton value={code.value} label={payload.type === "url" ? "Copy link" : "Copy raw text"} />
         <ShareButton text={code.value} />
       </div>
     </motion.section>

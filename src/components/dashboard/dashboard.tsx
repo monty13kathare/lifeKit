@@ -1,25 +1,15 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
-import {
-  ArrowRight,
-  ChevronRight,
-  FileText,
-  Image as ImageIcon,
-  Scan,
-  RefreshCw,
-  LayoutGrid,
-  Shrink,
-  MoreHorizontal,
-  MoreVertical,
-  Repeat,
-  ListTodo,
-  Bookmark
-} from "lucide-react"
-import { cn } from "@/lib/utils"
-import { useNotes, useTasks, useBookmarks } from "@/hooks/use-lifekit-data"
+import { motion } from "framer-motion"
+import { ArrowRight, Camera, CalendarCheck, ChevronRight, Droplet, Flame, Gamepad2, HeartPulse, LayoutGrid, ListTodo, ScanLine, ShieldCheck, type LucideIcon } from "lucide-react"
+import { CATEGORY_META, getTool, TOOL_CATEGORY_ORDER, toolsByCategory, type Tool } from "@/data/tools"
+import { useLearnFun, useTasks, useWellness } from "@/hooks/use-lifekit-data"
 import { useHydrated } from "@/hooks/use-store"
+import { todayString } from "@/lib/dates"
+import { levelInfo, liveDayStreak } from "@/lib/learn/fun"
+import { cn } from "@/lib/utils"
+import { HomeHero } from "./home-hero"
 
 const COLOR_STYLES = {
   rose: { icon: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10", glow: "bg-rose-500" },
@@ -29,291 +19,222 @@ const COLOR_STYLES = {
   orange: { icon: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/10", glow: "bg-orange-500" },
   pink: { icon: "text-pink-600 dark:text-pink-400", bg: "bg-pink-500/10", glow: "bg-pink-500" },
   indigo: { icon: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-500/10", glow: "bg-indigo-500" },
-  slate: { icon: "text-slate-600 dark:text-slate-400", bg: "bg-slate-500/10", glow: "bg-slate-500" },
   sky: { icon: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10", glow: "bg-sky-500" },
-  violet: { icon: "text-violet-600 dark:text-violet-400", bg: "bg-violet-500/10", glow: "bg-violet-500" },
   amber: { icon: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", glow: "bg-amber-500" },
+  slate: { icon: "text-slate-600 dark:text-slate-400", bg: "bg-slate-500/10", glow: "bg-slate-500" },
 }
 
-function ToolCard({
-  icon: Icon,
-  color,
-  title,
-  desc,
-  href,
-}: {
-  icon: React.ElementType
-  color: keyof typeof COLOR_STYLES
-  title: string
-  desc: string
-  href: string
-}) {
-  const styles = COLOR_STYLES[color]
-
-  return (
-    <Link href={href} className="group relative flex flex-col items-center justify-center rounded-[1.25rem] bg-card p-2 sm:p-3 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-95 border border-border/40 overflow-hidden aspect-square sm:aspect-auto sm:min-h-[110px]">
-      
-      {/* LIGHT MODE: Soft large pastel background block */}
-      <div className={cn("absolute inset-x-2 top-2 bottom-12 rounded-[1rem] opacity-100 dark:opacity-0 transition-opacity", styles.bg)} />
-
-      {/* DARK MODE: Top ambient glow */}
-      <div className={cn("absolute inset-x-0 -top-4 h-16 blur-xl opacity-0 dark:opacity-[0.15] transition-opacity group-hover:dark:opacity-[0.2]", styles.glow)} />
-      
-      <div className="relative mb-1 sm:mb-2 flex flex-col items-center justify-center">
-        {/* DARK MODE: Glow behind icon container */}
-        <div className={cn("absolute inset-0 blur-md opacity-0 dark:opacity-30", styles.glow)} />
-        
-        {/* Icon container */}
-        <div className={cn("relative flex size-10 items-center justify-center rounded-xl sm:size-[42px] sm:rounded-2xl", styles.bg)}>
-          <Icon className={cn("size-5 sm:size-[22px]", styles.icon)} strokeWidth={2} />
-        </div>
-      </div>
-      
-      <span className="relative text-center text-[10px] font-bold text-foreground sm:text-[11.5px] tracking-tight leading-tight z-10 px-0.5">
-        {title}
-      </span>
-      <span className="relative mt-0.5 text-center text-[8px] font-medium text-muted-foreground sm:text-[9.5px] z-10 hidden sm:block">
-        {desc}
-      </span>
-    </Link>
-  )
-}
-
-function FilterChip({
-  label,
-  active,
-  icon: Icon,
-  onClick,
-}: {
-  label: string
-  active?: boolean
-  icon?: React.ElementType
-  onClick?: () => void
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        "flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-xs font-bold transition-colors",
-        active
-          ? "bg-primary text-primary-foreground shadow-sm"
-          : "bg-card text-muted-foreground shadow-soft border border-border/50 hover:bg-muted"
-      )}
-    >
-      {Icon && <Icon className="size-3.5" strokeWidth={2.5} />}
-      {label}
-    </button>
-  )
-}
-
-function FileItem({
-  name,
-  size,
-  date,
-  icon: Icon,
-  color,
-  image,
-  href = "#",
-}: {
-  name: string
-  size: string
-  date: string
-  icon: React.ElementType
-  color: string
-  image?: string
-  href?: string
-}) {
-  return (
-    <Link href={href} className="flex items-center gap-3 rounded-2xl bg-card p-3 shadow-soft sm:p-4 border border-border/50 hover:bg-muted/50 transition-colors">
-      <div
-        className={cn(
-          "flex size-12 shrink-0 items-center justify-center rounded-xl overflow-hidden",
-          color,
-          image ? "bg-transparent p-0" : ""
-        )}
-      >
-        {image ? (
-          <img src={image} alt={name} className="size-full object-cover" />
-        ) : (
-          <Icon className="size-6" strokeWidth={2.5} />
-        )}
-      </div>
-      <div className="flex flex-1 flex-col justify-center min-w-0">
-        <h4 className="truncate text-xs font-bold text-foreground sm:text-sm">{name}</h4>
-        <p className="mt-0.5 truncate text-[10px] font-medium text-muted-foreground sm:text-xs">
-          {size} • {date}
-        </p>
-      </div>
-      <button className="flex size-8 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground">
-        <MoreVertical className="size-5" />
-      </button>
-    </Link>
-  )
-}
+/** Popular tools on Home (registry ids) with their tile colour. */
+const POPULAR: { id: string; color: keyof typeof COLOR_STYLES }[] = [
+  { id: "text-to-pdf", color: "rose" },
+  { id: "image-to-pdf", color: "blue" },
+  { id: "pdf-editor", color: "pink" },
+  { id: "ocr", color: "emerald" },
+  { id: "qr-generator", color: "indigo" },
+  { id: "image-compressor", color: "sky" },
+  { id: "smart-calculator", color: "amber" },
+  { id: "ai-writer", color: "purple" },
+]
 
 export function Dashboard() {
-  const [activeFilter, setActiveFilter] = useState("All")
-  const hydrated = useHydrated()
-  const { notes } = useNotes()
-  const { tasks } = useTasks()
-  const { bookmarks } = useBookmarks()
-
-  const recentItems = hydrated
-    ? [
-        ...notes.map((n) => ({ ...n, type: "Note", icon: FileText, color: "bg-rose-500/10 text-rose-600 dark:text-rose-400", href: "/tools/notes" })),
-        ...tasks.map((t) => ({ ...t, type: "Task", icon: ListTodo, color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400", href: "/tools/todo" })),
-        ...bookmarks.map((b) => ({ ...b, type: "Bookmark", icon: Bookmark, color: "bg-teal-500/10 text-teal-600 dark:text-teal-400", href: "/tools/bookmarks" })),
-      ]
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    : []
-
-  const filteredItems = recentItems
-    .filter((item) => {
-      if (activeFilter === "All") return true
-      if (activeFilter === "Notes") return item.type === "Note"
-      if (activeFilter === "Tasks") return item.type === "Task"
-      if (activeFilter === "Links") return item.type === "Bookmark"
-      return true
-    })
-    .slice(0, 5)
-
   return (
-    <div className="min-h-screen pb-32 font-sans">
-      <div className="mx-auto max-w-4xl">
-
-
-        {/* Banner */}
-        <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-r from-[#215DF1] via-[#6159FF] to-[#FFA0D9] p-6 text-white shadow-xl sm:p-8">
-          {/* Decorative floating elements */}
-          <div className="absolute -right-4 -top-8 size-64 rounded-full bg-white/10 blur-3xl" />
-          <div className="absolute -bottom-16 right-16 size-48 rounded-full bg-pink-400/30 blur-2xl" />
-
-          {/* Abstract 3D blocks (simplified with CSS for exact vibe) */}
-          <div className="absolute -right-2 top-2 h-full w-1/2 pointer-events-none opacity-90 hidden sm:block">
-            {/* These simulate the 3D items in the image */}
-            <div className="absolute right-4 top-4 rotate-12 rounded-xl bg-white/20 p-4 backdrop-blur-md border border-white/30 shadow-lg">
-              <FileText className="size-10 text-white" />
-            </div>
-            <div className="absolute right-24 top-20 -rotate-6 rounded-xl bg-blue-400/40 p-3 backdrop-blur-md border border-white/20 shadow-lg">
-              <ImageIcon className="size-8 text-white" />
-            </div>
-          </div>
-
-          <div className="relative z-10 w-full sm:w-2/3">
-            <h2 className="text-[22px] font-bold leading-tight drop-shadow-md sm:text-3xl md:text-4xl tracking-tight">
-              Edit. Convert. Scan.<br />Manage. Share.
-            </h2>
-            <p className="mt-2 text-xs font-medium text-blue-50 opacity-90 sm:text-sm drop-shadow">
-              All your files, in one place.
-            </p>
-            <Link href="/" className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-xs font-bold text-blue-700 shadow-lg hover:bg-blue-50 transition-colors sm:text-sm">
-              Explore Tools <ArrowRight className="size-[14px]" strokeWidth={2.5} />
-            </Link>
-          </div>
-        </div>
-
-        {/* Popular Tools */}
-        <div className="mt-8">
-          <div className="mb-4 flex items-center justify-between px-1">
-            <h3 className="text-lg font-bold text-foreground tracking-tight">Popular Tools</h3>
-            <Link href="/tools" className="flex min-h-10 items-center gap-0.5 rounded-full bg-card px-3.5 text-xs font-bold text-muted-foreground shadow-soft hover:text-foreground transition-colors border border-border/50">
-              View All <ChevronRight className="size-3" strokeWidth={3} />
-            </Link>
-          </div>
-          <div className="grid grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
-            <ToolCard
-              icon={FileText}
-              color="rose"
-              title="Text to PDF"
-              desc="Notes to PDF"
-              href="/tools/text-to-pdf"
-            />
-            <ToolCard
-              icon={ImageIcon}
-              color="blue"
-              title="Image to PDF"
-              desc="Convert Images"
-              href="/tools/image-to-pdf"
-            />
-            <ToolCard
-              icon={Scan}
-              color="emerald"
-              title="OCR"
-              desc="Extract Text"
-              href="/tools/ocr"
-            />
-            <ToolCard
-              icon={Repeat}
-              color="sky"
-              title="Resize Image"
-              desc="Dimensions"
-              href="/tools/image-resizer"
-            />
-            <ToolCard
-              icon={RefreshCw}
-              color="violet"
-              title="AI Writer"
-              desc="Draft & Edit"
-              href="/tools/ai-writer"
-            />
-            <ToolCard
-              icon={LayoutGrid}
-              color="pink"
-              title="Summarizer"
-              desc="TL;DR Text"
-              href="/tools/summarizer"
-            />
-            <ToolCard
-              icon={Shrink}
-              color="amber"
-              title="SecureShare"
-              desc="Private Links"
-              href="/tools/secure-share"
-            />
-            <ToolCard
-              icon={MoreHorizontal}
-              color="slate"
-              title="More Tools"
-              desc="Find More"
-              href="/tools"
-            />
-          </div>
-        </div>
-
-        {/* Recent Files */}
-        <div className="mt-8">
-          <div className="mb-4 flex items-center justify-between px-1">
-            <h3 className="text-lg font-bold text-foreground tracking-tight">Recent Activity</h3>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar px-1 -mx-1">
-            <FilterChip label="All" active={activeFilter === "All"} onClick={() => setActiveFilter("All")} />
-            <FilterChip label="Notes" active={activeFilter === "Notes"} onClick={() => setActiveFilter("Notes")} />
-            <FilterChip label="Tasks" active={activeFilter === "Tasks"} onClick={() => setActiveFilter("Tasks")} />
-            <FilterChip label="Links" active={activeFilter === "Links"} onClick={() => setActiveFilter("Links")} />
-          </div>
-          <div className="mt-4 flex flex-col gap-3">
-            {!hydrated ? (
-              <div className="p-4 text-center text-sm text-muted-foreground animate-pulse">Loading recent activity...</div>
-            ) : filteredItems.length === 0 ? (
-              <div className="p-4 text-center text-sm text-muted-foreground">No recent activity yet.</div>
-            ) : (
-              filteredItems.map((item) => (
-                <FileItem
-                  key={item.id}
-                  name={item.title}
-                  size={item.type}
-                  date={new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(item.createdAt))}
-                  icon={item.icon}
-                  color={item.color}
-                  href={item.href}
-                />
-              ))
-            )}
-          </div>
-        </div>
+    <div className="pb-10">
+      <div className="mx-auto max-w-5xl space-y-8">
+        <HomeHero />
+        <PopularTools />
+        <Featured />
+        <ExploreTools />
+        <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+          <ShieldCheck className="size-3.5 text-success" aria-hidden /> Private by design — your data stays on this device.
+        </p>
       </div>
     </div>
+  )
+}
+
+/* ------------------------------------------------------------- Popular */
+
+function SectionHeader({ title, subtitle, href, cta = "View all" }: { title: string; subtitle?: string; href?: string; cta?: string }) {
+  return (
+    <div className="mb-3 flex items-end justify-between gap-3">
+      <div className="min-w-0">
+        <h2 className="text-lg font-bold tracking-tight">{title}</h2>
+        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+      </div>
+      {href && (
+        <Link href={href} className="inline-flex min-h-10 shrink-0 items-center gap-0.5 rounded-full border bg-card px-3.5 text-xs font-bold text-muted-foreground transition-colors hover:text-foreground">
+          {cta} <ChevronRight className="size-3.5" aria-hidden />
+        </Link>
+      )}
+    </div>
+  )
+}
+
+function PopularTools() {
+  return (
+    <section aria-labelledby="popular-title">
+      <div id="popular-title">
+        <SectionHeader title="Popular tools" href="/tools" />
+      </div>
+      <ul className="grid grid-cols-4 gap-2.5 sm:gap-3">
+        {POPULAR.map(({ id, color }) => (
+          <li key={id}>
+            <PopularTile tool={getTool(id)} color={color} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+function PopularTile({ tool, color }: { tool: Tool; color: keyof typeof COLOR_STYLES }) {
+  const styles = COLOR_STYLES[color]
+  const Icon = tool.icon
+  return (
+    <Link
+      href={tool.href}
+      className="group relative flex aspect-square flex-col items-center justify-center gap-1.5 overflow-hidden rounded-[1.25rem] border border-border/40 bg-card p-1.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-95 sm:aspect-auto sm:min-h-28 sm:p-3"
+    >
+      <div className={cn("absolute inset-x-0 -top-4 h-16 opacity-0 blur-xl transition-opacity dark:opacity-15 dark:group-hover:opacity-25", styles.glow)} aria-hidden />
+      <span className={cn("relative flex size-10 items-center justify-center rounded-xl sm:size-11 sm:rounded-2xl", styles.bg)}>
+        <Icon className={cn("size-5", styles.icon)} aria-hidden />
+      </span>
+      <span className="relative text-center text-[0.68rem] leading-tight font-bold tracking-tight sm:text-xs">{tool.name}</span>
+    </Link>
+  )
+}
+
+/* ------------------------------------------------------------ Featured */
+
+function Featured() {
+  const hydrated = useHydrated()
+  const { tasks } = useTasks()
+  const { stats } = useLearnFun()
+  const { days, goals, plan } = useWellness()
+  const today = todayString()
+  const due = tasks.filter((t) => !t.completed && t.dueDate && t.dueDate <= today).length
+  const lvl = levelInfo(stats.xp)
+  const streak = liveDayStreak(stats)
+  const water = days.find((d) => d.id === today)?.waterGlasses ?? 0
+
+  const cards: { href: string; title: string; text: string; stat: string; statIcon: LucideIcon; icon: LucideIcon; tile: string; gradient: string }[] = [
+    {
+      href: "/my-life",
+      title: "My Day",
+      text: "Tasks, routine, calendar and reminders in one view.",
+      stat: due ? `${due} ${due === 1 ? "task" : "tasks"} due today` : "You're all caught up",
+      statIcon: ListTodo,
+      icon: CalendarCheck,
+      tile: "bg-indigo-500/12 text-indigo-600 ring-indigo-500/20 dark:text-indigo-300",
+      gradient: "from-indigo-500/15 via-indigo-500/5",
+    },
+    {
+      href: "/learn",
+      title: "Learn with Fun",
+      text: "Quiz games for logic, English, riddles and stories — English & हिन्दी.",
+      stat: stats.games ? `Level ${lvl.level} · ${streak ? `${streak}-day streak` : `${stats.xp} XP`}` : "Play your first quiz",
+      statIcon: Flame,
+      icon: Gamepad2,
+      tile: "bg-violet-500/12 text-violet-600 ring-violet-500/20 dark:text-violet-300",
+      gradient: "from-violet-500/15 via-fuchsia-500/5",
+    },
+    {
+      href: "/tools/wellness",
+      title: "Wellness & AI Guide",
+      text: "Diet, workouts and a daily routine made for your goal.",
+      stat: plan ? `Water ${water}/${goals.waterGlasses} · plan ready` : `Water ${water}/${goals.waterGlasses} today`,
+      statIcon: Droplet,
+      icon: HeartPulse,
+      tile: "bg-rose-500/12 text-rose-600 ring-rose-500/20 dark:text-rose-300",
+      gradient: "from-rose-500/15 via-rose-500/5",
+    },
+    {
+      href: "/scan",
+      title: "Scan Everything",
+      text: "QR codes, barcodes and text with one camera.",
+      stat: "Camera or photo upload",
+      statIcon: Camera,
+      icon: ScanLine,
+      tile: "bg-emerald-500/12 text-emerald-600 ring-emerald-500/20 dark:text-emerald-300",
+      gradient: "from-emerald-500/15 via-emerald-500/5",
+    },
+  ]
+
+  return (
+    <section aria-labelledby="featured-title">
+      <h2 id="featured-title" className="mb-3 text-lg font-bold tracking-tight">
+        Featured
+      </h2>
+      <motion.ul
+        initial="hidden"
+        animate="show"
+        variants={{ hidden: {}, show: { transition: { staggerChildren: 0.06 } } }}
+        className="grid gap-3 sm:grid-cols-2"
+      >
+        {cards.map((c) => (
+          <motion.li key={c.href} variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}>
+            <Link
+              href={c.href}
+              className={cn(
+                "group relative flex h-full items-center gap-4 overflow-hidden rounded-2xl border bg-linear-to-br to-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-soft active:scale-[0.99]",
+                c.gradient
+              )}
+            >
+              <span className={cn("flex size-12 shrink-0 items-center justify-center rounded-2xl ring-1 sm:size-14", c.tile)} aria-hidden>
+                <c.icon className="size-6 sm:size-7" strokeWidth={1.75} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">{c.title}</span>
+                <span className="mt-0.5 block text-sm text-muted-foreground">{c.text}</span>
+                <span className={cn("mt-2 inline-flex items-center gap-1.5 rounded-full border bg-card/80 px-2.5 py-0.5 text-xs font-medium", !hydrated && "opacity-0")}>
+                  <c.statIcon className="size-3.5 text-muted-foreground" aria-hidden /> {c.stat}
+                </span>
+              </span>
+              <ArrowRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+            </Link>
+          </motion.li>
+        ))}
+      </motion.ul>
+    </section>
+  )
+}
+
+/* ------------------------------------------------------- Explore tools */
+
+function ExploreTools() {
+  return (
+    <section aria-labelledby="explore-title" className="space-y-6">
+      <div id="explore-title">
+        <SectionHeader title="Explore all tools" subtitle="Everything LifeKit can do" href="/tools" cta="Browse" />
+      </div>
+      {TOOL_CATEGORY_ORDER.map((cat) => {
+        const tools = toolsByCategory(cat)
+        if (!tools.length) return null
+        return (
+          <div key={cat}>
+            <div className="mb-2">
+              <h3 className="font-semibold">{CATEGORY_META[cat].label}</h3>
+              <p className="text-xs text-muted-foreground">{CATEGORY_META[cat].description}</p>
+            </div>
+            <ul className="no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-4">
+              {tools.map((t) => (
+                <li key={t.id} className="w-40 shrink-0 snap-start sm:w-auto">
+                  <Link href={t.href} className="flex h-full flex-col gap-2 rounded-2xl border bg-card p-3 transition-colors hover:border-primary/30 hover:bg-muted/40">
+                    <span className={cn("flex size-9 items-center justify-center rounded-xl", t.accent)}>
+                      <t.icon className="size-4.5" aria-hidden />
+                    </span>
+                    <span className="text-sm font-semibold">{t.name}</span>
+                    <span className="line-clamp-2 text-xs text-muted-foreground">{t.description}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      })}
+      <Link href="/tools" className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-dashed text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">
+        <LayoutGrid className="size-4" aria-hidden /> See every tool
+      </Link>
+    </section>
   )
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { CalendarPlus, Dumbbell, Lightbulb, ListChecks, Loader2, MessageCircleQuestion, RefreshCw, Send, Sparkles, Stethoscope, Sunrise, Utensils, type LucideIcon } from "lucide-react"
+import { Activity, CalendarPlus, Moon, Scale, Target, TrendingDown, TrendingUp, Zap, Dumbbell, Lightbulb, ListChecks, Loader2, MessageCircleQuestion, RefreshCw, Send, Sparkles, Stethoscope, Sunrise, Utensils, type LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 import { AiLanguageToggle } from "@/components/common/ai-language-toggle"
@@ -22,13 +22,13 @@ import type { HealthGoal, HealthPlan, HealthProfile } from "@/types"
 import { GoalChangesSheet } from "./goal-changes-sheet"
 import { buildHealthInput, goalChanges, kgToLb, lastSevenDays, lbToKg, type WeightUnit } from "./health-utils"
 
-const GOALS: { id: HealthGoal; emoji: string }[] = [
-  { id: "lose-weight", emoji: "🔥" },
-  { id: "gain-weight", emoji: "💪" },
-  { id: "maintain", emoji: "⚖️" },
-  { id: "build-fitness", emoji: "🏃" },
-  { id: "more-energy", emoji: "⚡" },
-  { id: "better-sleep", emoji: "😴" },
+const GOALS: { id: HealthGoal; icon: LucideIcon }[] = [
+  { id: "lose-weight", icon: TrendingDown },
+  { id: "gain-weight", icon: TrendingUp },
+  { id: "maintain", icon: Scale },
+  { id: "build-fitness", icon: Activity },
+  { id: "more-energy", icon: Zap },
+  { id: "better-sleep", icon: Moon },
 ]
 
 type Section = "diet" | "workout" | "routine" | "tips"
@@ -145,7 +145,7 @@ export function HealthGuide({ weightUnit, onEditProfile }: HealthGuideProps) {
                 profile.goal === g.id ? "border-primary bg-primary/8" : "border-border hover:bg-muted/60"
               )}
             >
-              <span aria-hidden>{g.emoji}</span> {GOAL_META[g.id].label}
+              <g.icon className={cn("size-4.5 shrink-0", profile.goal === g.id ? "text-primary" : "text-muted-foreground")} aria-hidden /> {GOAL_META[g.id].label}
             </button>
           ))}
         </div>
@@ -205,7 +205,8 @@ export function HealthGuide({ weightUnit, onEditProfile }: HealthGuideProps) {
               <ul className="mt-3 flex flex-wrap gap-2">
                 {plan.data.focus.map((f) => (
                   <li key={f} className="rounded-full bg-card px-3 py-1 text-xs font-medium">
-                    🎯 {f}
+                    <Target className="mr-1 inline size-3.5 text-primary" aria-hidden />
+                    {f}
                   </li>
                 ))}
               </ul>

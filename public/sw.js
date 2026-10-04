@@ -98,8 +98,11 @@ async function networkFirstPage(event) {
     return res
   } catch {
     const cache = await caches.open(PAGE_CACHE)
+    const cached = await cache.match(key)
+    if (cached) return cached
+    // Redirect (rather than serve the offline page under this URL) so the app hydrates on the right route.
+    if (key !== OFFLINE_URL && (await cache.match(OFFLINE_URL))) return Response.redirect(OFFLINE_URL, 302)
     return (
-      (await cache.match(key)) ||
       (await cache.match(OFFLINE_URL)) ||
       new Response("<h1>You're offline</h1><p>Reconnect to open this page.</p>", {
         status: 503,

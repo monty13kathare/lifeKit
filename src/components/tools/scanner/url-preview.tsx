@@ -77,6 +77,7 @@ export function UrlPreview({ raw, analysis }: { raw: string; analysis: UrlAnalys
       {analysis.openable && !analysis.blocked ? (
         <Button
           variant={danger ? "destructive" : "default"}
+          size="lg"
           className="w-full sm:w-auto"
           onClick={() => (risky ? setConfirmOpen(true) : open())}
         >

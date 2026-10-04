@@ -155,3 +155,44 @@ export function resetAllData() {
   }
   registry.forEach((store) => store.reset())
 }
+
+/* ------------------------------------------------------- Backup/restore */
+
+export interface LifeKitBackup {
+  app: "lifekit"
+  version: 1
+  exportedAt: string
+  data: Record<string, unknown>
+}
+
+/** Snapshot of every store, for a backup file the user downloads. */
+export function exportAllData(): LifeKitBackup {
+  const data: Record<string, unknown> = {}
+  registry.forEach((store, key) => {
+    data[key] = store.get()
+  })
+  return { app: "lifekit", version: 1, exportedAt: new Date().toISOString(), data }
+}
+
+const sameShape = (a: unknown, b: unknown) =>
+  Array.isArray(a) === Array.isArray(b) && (a === null || b === null || typeof a === typeof b)
+
+/**
+ * Restore a backup made by `exportAllData`. Only known stores are written, and
+ * only when the value has the same shape as the store's data (array vs object).
+ * Returns how many stores were restored; throws on a file that isn't a backup.
+ */
+export function importAllData(raw: unknown): number {
+  const b = raw as Partial<LifeKitBackup> | null
+  if (!b || b.app !== "lifekit" || b.version !== 1 || !b.data || typeof b.data !== "object" || Array.isArray(b.data)) {
+    throw new Error("This isn't a LifeKit backup file.")
+  }
+  let restored = 0
+  for (const [key, value] of Object.entries(b.data)) {
+    const store = registry.get(key)
+    if (!store || value === undefined || !sameShape(store.get(), value)) continue
+    store.set(value)
+    restored++
+  }
+  return restored
+}

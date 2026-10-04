@@ -1,7 +1,12 @@
+import { z } from "zod"
 import { assertRateLimit, assertSameOrigin, errorResponse } from "@/lib/ai/guard.server"
 import { generate } from "@/lib/ai/gemini.server"
 
 export const maxDuration = 60 // Allow up to 60s for vision tasks
+
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]
+/** Tesseract-style codes, e.g. "eng", "hin", "chi_sim". */
+const langSchema = z.string().regex(/^[a-z]{3}(_[a-z]{3,4})?$/).catch("eng")
 
 export async function POST(request: Request) {
   try {
@@ -9,11 +14,14 @@ export async function POST(request: Request) {
     assertRateLimit(request)
 
     const formData = await request.formData()
-    const image = formData.get("image") as File | null
-    const lang = formData.get("lang") as string || "eng"
+    const image = formData.get("image")
+    const lang = langSchema.parse(formData.get("lang") ?? "eng")
 
-    if (!image) {
+    if (!(image instanceof File) || image.size === 0) {
       return Response.json({ error: "No image provided." }, { status: 400 })
+    }
+    if (!IMAGE_TYPES.includes(image.type)) {
+      return Response.json({ error: "Please upload a JPG, PNG or WebP image." }, { status: 415 })
     }
 
     if (image.size > 15 * 1024 * 1024) {
@@ -27,7 +35,7 @@ export async function POST(request: Request) {
     const system = "You are a highly accurate Optical Character Recognition (OCR) engine. Your task is to extract all visible text from the provided image exactly as it appears. Preserve the original language, formatting, line breaks, and punctuation. Do not describe the image, do not add conversational text, just output the extracted text. If there is no text in the image, output an empty string."
     
     let promptText = "Please extract the text from this image."
-    if (lang && lang !== "eng") {
+    if (lang !== "eng") {
       promptText = `Please extract the text from this image. The text may be in language code '${lang}'. Keep the exact language and characters.`
     }
 
@@ -47,7 +55,8 @@ export async function POST(request: Request) {
       signal: request.signal,
     })
 
-    return Response.json({ text: raw.trim(), confidence: 99 }) // Gemini usually has high confidence if it returns text
+    // Gemini reports no real confidence score, so none is returned.
+    return Response.json({ text: raw.trim() })
   } catch (err) {
     return errorResponse(err)
   }

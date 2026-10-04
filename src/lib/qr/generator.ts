@@ -1,8 +1,20 @@
 /** Form schemas and payload builders for the QR generator. */
 import { z } from "zod"
-import { buildVcf } from "./payload"
+import { buildVcf, escapeText } from "./payload"
 
-export type QrContentType = "url" | "text" | "contact" | "wifi" | "email" | "phone" | "sms" | "location" | "file"
+export type QrContentType =
+  | "url"
+  | "text"
+  | "contact"
+  | "wifi"
+  | "email"
+  | "phone"
+  | "sms"
+  | "whatsapp"
+  | "upi"
+  | "event"
+  | "location"
+  | "file"
 
 export type FormValues = Record<string, string | boolean>
 
@@ -21,6 +33,56 @@ export function normalizeUrl(v: string) {
   const t = v.trim()
   return /^[a-z][a-z0-9+.-]*:\/\//i.test(t) ? t : `https://${t}`
 }
+
+/** UPI virtual payment address: handle@psp (e.g. name@okaxis, 9876543210@ybl). */
+export const UPI_VPA_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{1,255}@[a-zA-Z][a-zA-Z0-9.-]{1,63}$/
+
+interface EventFields {
+  allDay: boolean
+  startDate: string
+  startTime: string
+  endDate: string
+  endTime: string
+}
+
+function localDate(date: string, time = "00:00") {
+  const [y, m, d] = date.split("-").map(Number)
+  const [h, mi] = time.split(":").map(Number)
+  const out = new Date(y, m - 1, d, h || 0, mi || 0)
+  return Number.isNaN(out.getTime()) ? null : out
+}
+
+/**
+ * Start and (exclusive) end of an event in local time. All-day events end at
+ * midnight after the last day; timed events default to one hour.
+ */
+export function eventRange(v: EventFields): { start: Date; end: Date } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v.startDate)) return null
+  if (v.allDay) {
+    const start = localDate(v.startDate)
+    const last = localDate(/^\d{4}-\d{2}-\d{2}$/.test(v.endDate) ? v.endDate : v.startDate)
+    if (!start || !last) return null
+    return { start, end: new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1) }
+  }
+  if (!/^\d{2}:\d{2}$/.test(v.startTime)) return null
+  const start = localDate(v.startDate, v.startTime)
+  if (!start) return null
+  if (!/^\d{2}:\d{2}$/.test(v.endTime)) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v.endDate) && v.endDate !== v.startDate) {
+      const end = localDate(v.endDate, v.startTime)
+      return end ? { start, end } : null
+    }
+    return { start, end: new Date(start.getTime() + 3600_000) }
+  }
+  const end = localDate(/^\d{4}-\d{2}-\d{2}$/.test(v.endDate) ? v.endDate : v.startDate, v.endTime)
+  return end ? { start, end } : null
+}
+
+const pad = (n: number) => String(n).padStart(2, "0")
+/** iCalendar DATE (yyyyMMdd). */
+const icsDate = (d: Date) => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`
+/** iCalendar floating local DATE-TIME (yyyyMMddTHHmmss, no Z — the scanner's own time zone). */
+const icsDateTime = (d: Date) => `${icsDate(d)}T${pad(d.getHours())}${pad(d.getMinutes())}00`
 
 const optionalEmail = z
   .string()
@@ -58,7 +120,9 @@ export const schemas = {
     .object({
       ssid: z.string().min(1, "Enter the network name").max(32, "Network names are at most 32 characters"),
       encryption: z.enum(["WPA", "WEP", "nopass"]),
-      password: z.string().max(63, "Wi-Fi passwords are at most 63 characters"),
+      password: z
+        .string()
+        .refine((p) => p.length <= 63 || /^[0-9a-f]{64}$/i.test(p), "Wi-Fi passwords are at most 63 characters (or a 64-digit hex key)"),
       hidden: z.boolean(),
     })
     .superRefine((v, ctx) => {
@@ -79,6 +143,49 @@ export const schemas = {
     phone: z.string().trim().regex(phoneRe, "Enter a valid phone number"),
     message: z.string().max(1000),
   }),
+  whatsapp: z.object({
+    phone: z
+      .string()
+      .trim()
+      .min(1, "Enter a WhatsApp number")
+      .refine((v) => phoneRe.test(v), "Use digits only, e.g. +91 98765 43210")
+      .refine((v) => /^[1-9]\d{7,14}$/.test(v.replace(/\D/g, "")), "Include the country code, e.g. +91 98765 43210"),
+    message: z.string().max(1000, "Keep the message under 1,000 characters"),
+  }),
+  upi: z.object({
+    vpa: z.string().trim().min(1, "Enter the UPI ID").regex(UPI_VPA_RE, "Enter a valid UPI ID, e.g. name@okbank"),
+    name: z.string().trim().max(60, "Keep the name under 60 characters"),
+    amount: z
+      .string()
+      .trim()
+      .refine((v) => !v || /^\d{1,7}(\.\d{1,2})?$/.test(v.replace(/,/g, "")), "Enter an amount like 250 or 99.50 (max 2 decimals)")
+      .refine((v) => !v || (Number(v.replace(/,/g, "")) > 0 && Number(v.replace(/,/g, "")) <= 500000), "Amount must be between ₹0.01 and ₹5,00,000"),
+    note: z.string().trim().max(80, "Keep the note under 80 characters"),
+  }),
+  event: z
+    .object({
+      title: z.string().trim().min(1, "Enter an event title").max(200, "Keep the title under 200 characters"),
+      allDay: z.boolean(),
+      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a start date"),
+      startTime: z.string(),
+      endDate: z.string(),
+      endTime: z.string(),
+      location: z.string().trim().max(200, "Keep the location under 200 characters"),
+      description: z.string().trim().max(800, "Keep the description under 800 characters"),
+    })
+    .superRefine((v, ctx) => {
+      if (!v.allDay && !/^\d{2}:\d{2}$/.test(v.startTime)) ctx.addIssue({ code: "custom", message: "Choose a start time", path: ["startTime"] })
+      if (v.endDate && !/^\d{4}-\d{2}-\d{2}$/.test(v.endDate)) ctx.addIssue({ code: "custom", message: "Choose a valid end date", path: ["endDate"] })
+      if (!v.allDay && v.endTime && !/^\d{2}:\d{2}$/.test(v.endTime)) ctx.addIssue({ code: "custom", message: "Choose a valid end time", path: ["endTime"] })
+      const range = eventRange(v)
+      if (range && range.end <= range.start) {
+        ctx.addIssue({
+          code: "custom",
+          message: v.allDay ? "The end date can't be before the start date" : "The event must end after it starts",
+          path: [v.allDay || (v.endDate && v.endDate !== v.startDate) ? "endDate" : "endTime"],
+        })
+      }
+    }),
   location: z.object({
     lat: z
       .string()
@@ -94,6 +201,9 @@ export const schemas = {
 } as const
 
 export const DEFAULTS: Record<Exclude<QrContentType, "file">, FormValues> = {
+  whatsapp: { phone: "", message: "" },
+  upi: { vpa: "", name: "", amount: "", note: "" },
+  event: { title: "", allDay: false, startDate: "", startTime: "", endDate: "", endTime: "", location: "", description: "" },
   url: { url: "" },
   text: { text: "" },
   contact: { firstName: "", lastName: "", phone: "", email: "", org: "", title: "", website: "", address: "", note: "" },
@@ -135,8 +245,10 @@ export function buildPayload(type: Exclude<QrContentType, "file">, values: FormV
       break
     case "contact": {
       const name = [s("firstName"), s("lastName")].filter(Boolean).join(" ")
-      const vcf = buildVcf({
+      payload = buildVcf({
         name: name || s("org"),
+        firstName: s("firstName"),
+        lastName: s("lastName"),
         org: s("org") || undefined,
         title: s("title") || undefined,
         phones: s("phone") ? [s("phone")] : [],
@@ -145,8 +257,32 @@ export function buildPayload(type: Exclude<QrContentType, "file">, values: FormV
         address: s("address") || undefined,
         note: s("note") || undefined,
       })
-      // Use the structured N field properly (last;first).
-      payload = vcf.replace(/^N:.*$/m, `N:${s("lastName").replace(/[;,]/g, " ")};${s("firstName").replace(/[;,]/g, " ")};;;`)
+      break
+    }
+    case "whatsapp": {
+      const msg = String(v.message ?? "")
+      payload = `https://wa.me/${s("phone").replace(/\D/g, "")}${msg.trim() ? `?text=${encodeURIComponent(msg)}` : ""}`
+      break
+    }
+    case "upi": {
+      // NPCI linking spec order: pa, pn, am, cu, tn. Spaces are %20 (not '+').
+      const params = [`pa=${s("vpa")}`]
+      if (s("name")) params.push(`pn=${encodeURIComponent(s("name"))}`)
+      if (s("amount")) params.push(`am=${Number(s("amount").replace(/,/g, "")).toFixed(2)}`)
+      params.push("cu=INR")
+      if (s("note")) params.push(`tn=${encodeURIComponent(s("note"))}`)
+      payload = `upi://pay?${params.join("&")}`
+      break
+    }
+    case "event": {
+      const range = eventRange(parsed.data as unknown as EventFields)!
+      const lines = ["BEGIN:VEVENT", `SUMMARY:${escapeText(s("title"))}`]
+      if (v.allDay) lines.push(`DTSTART;VALUE=DATE:${icsDate(range.start)}`, `DTEND;VALUE=DATE:${icsDate(range.end)}`)
+      else lines.push(`DTSTART:${icsDateTime(range.start)}`, `DTEND:${icsDateTime(range.end)}`)
+      if (s("location")) lines.push(`LOCATION:${escapeText(s("location"))}`)
+      if (s("description")) lines.push(`DESCRIPTION:${escapeText(s("description"))}`)
+      lines.push("END:VEVENT")
+      payload = lines.join("\r\n")
       break
     }
     case "wifi":

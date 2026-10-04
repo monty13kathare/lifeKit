@@ -56,6 +56,13 @@ function TextToPdfEditor() {
   const [generatingPdf, setGeneratingPdf] = useState(false)
   const ai = useAiStatus()
   const aiReady = ai?.configured === true
+  const previewRef = useRef<HTMLElement>(null)
+
+  // On phones the preview sits below the editor: bring it into view.
+  const showPreview = (next: string) => {
+    setHtml(next)
+    requestAnimationFrame(() => previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }))
+  }
 
   useEffect(() => {
     // The hand-off is one-shot: forget it once it's in the editor.
@@ -72,7 +79,7 @@ function TextToPdfEditor() {
       toast.error("Please enter some text first.")
       return
     }
-    setHtml(plainTextToHtml(text, accent))
+    showPreview(plainTextToHtml(text, accent))
   }
 
   const formatWithAi = async () => {
@@ -94,7 +101,7 @@ function TextToPdfEditor() {
       })
       const data = (await res.json().catch(() => ({}))) as { html?: string; error?: string }
       if (!res.ok || !data.html) throw new Error(data.error || "Failed to format document.")
-      setHtml(data.html)
+      showPreview(data.html)
       toast.success("Document formatted.")
     } catch (e) {
       toast.error(e instanceof Error && e.message ? e.message : "Something went wrong while formatting.")
@@ -191,7 +198,7 @@ function TextToPdfEditor() {
       {/* Preview */}
       <div className="min-w-0 space-y-4">
         {html ? (
-          <section className="space-y-4 rounded-2xl border bg-card p-4 sm:p-5">
+          <section ref={previewRef} className="scroll-mt-20 space-y-4 rounded-2xl border bg-card p-4 sm:p-5">
             <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
               <h2 className="flex items-center gap-2 text-sm font-medium">
                 <Wand2 className="size-4 text-primary" /> Document preview

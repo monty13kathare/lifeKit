@@ -109,7 +109,7 @@ export function FileDropzone({
         <div className={cn("flex flex-wrap items-center justify-center gap-2", !compact && "mt-1")}>
           <Button
             type="button"
-            size={compact ? "sm" : "lg"}
+            size={compact ? "default" : "lg"}
             variant={compact ? "outline" : "default"}
             onClick={() => inputRef.current?.click()}
           >
@@ -118,7 +118,7 @@ export function FileDropzone({
           {allowCamera && (
             <Button
               type="button"
-              size={compact ? "sm" : "lg"}
+              size={compact ? "default" : "lg"}
               variant="outline"
               onClick={() => cameraRef.current?.click()}
             >

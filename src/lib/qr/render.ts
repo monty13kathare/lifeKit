@@ -99,3 +99,14 @@ export function qrErrorMessage(e: unknown): string {
   if (/no input text/i.test(msg)) return "Nothing to encode yet."
   return "This QR code couldn't be generated."
 }
+
+/** Module count (side length) and version of the QR symbol for `text`, or null if it doesn't fit. */
+export async function qrSymbolInfo(text: string, ecc: EccLevel): Promise<{ version: number; modules: number } | null> {
+  const QR = await loadQrLib()
+  try {
+    const sym = QR.create(text, { errorCorrectionLevel: ecc })
+    return { version: sym.version, modules: sym.modules.size }
+  } catch {
+    return null
+  }
+}
