@@ -12,9 +12,6 @@ import { useHydrated } from "@/hooks/use-store"
 import { expandEvents, greeting } from "@/lib/dates"
 import { nextOccurrence } from "@/lib/reminders"
 import { cn } from "@/lib/utils"
-import { DayPlanner } from "./my-life/day-planner"
-import { QuickCapture } from "./my-life/quick-capture"
-import { UpNext } from "./my-life/up-next"
 import { useToday } from "./my-life/use-today"
 
 const plural = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? one : many}`
@@ -126,12 +123,6 @@ export function MyLife() {
         ))}
       </ul>
 
-      <QuickCapture />
-
-      <div className={cn("grid grid-cols-1 gap-4", ai?.configured && "lg:grid-cols-2")}>
-        <UpNext hydrated={hydrated} now={now} items={today.items} untimedCount={today.untimedTasks.length} today={today.today} />
-        {ai?.configured && hydrated && <DayPlanner today={today} />}
-      </div>
 
       <div className="space-y-8 pt-2">
         {LIFE_CATEGORY_ORDER.map((category) => (

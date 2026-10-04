@@ -15,7 +15,7 @@ export function BottomNav() {
       aria-label="Main Navigation"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-border/50 bg-background/90 pb-safe backdrop-blur-xl supports-backdrop-filter:bg-background/80 shadow-lg lg:hidden"
     >
-      <ul className="mx-auto grid max-w-md grid-cols-5 items-center px-1">
+      <ul className="mx-auto grid max-w-md grid-cols-4 items-center px-1">
         {MOBILE_NAV.map(({ href, label, icon: Icon, isFab }) => {
           const isActive = href === "/tools/todo"
             ? pathname === "/tools/todo"

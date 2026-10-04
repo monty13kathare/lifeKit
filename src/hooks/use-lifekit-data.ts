@@ -17,6 +17,9 @@ import {
   DEFAULT_HEALTH_PROFILE,
   healthInsightsStore,
   healthProfileStore,
+  DEFAULT_FUN_STATS,
+  funQuizSetsStore,
+  funStatsStore,
 } from "@/lib/storage"
 import type { HealthProfile, Settings } from "@/types"
 
@@ -116,4 +119,11 @@ export function useGoals() {
 export function useDecisions() {
   const decisions = useStore(decisionsStore)
   return { decisions, ...pickMutations(decisionsStore) }
+}
+
+export function useLearnFun() {
+  const stored = useStore(funStatsStore)
+  const stats = useMemo(() => ({ ...DEFAULT_FUN_STATS, ...stored }), [stored])
+  const quizzes = useStore(funQuizSetsStore)
+  return { stats, resetStats: funStatsStore.reset, quizzes, ...pickMutations(funQuizSetsStore) }
 }

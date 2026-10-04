@@ -297,3 +297,59 @@ export interface HealthInsight {
   }
   demo?: boolean
 }
+
+/* ------------------------------------------------------- Learn with Fun */
+
+export type FunLanguage = "en" | "hi" | "both"
+export type FunDifficulty = "easy" | "medium" | "hard"
+export type FunMode = "classic" | "timed" | "survival" | "study"
+
+/** The readable text of a question in one language. */
+export interface FunQuestionText {
+  /** Short story/passage the question is about (story-based questions). */
+  story?: string
+  question: string
+  options: string[]
+  explanation: string
+}
+
+export interface FunQuestion extends FunQuestionText {
+  answerIndex: number
+  hint?: string
+  /** Hindi translation shown under the English text in "both" mode. */
+  hindi?: FunQuestionText
+}
+
+/** A quiz the user saved to replay later. */
+export interface FunQuizSet {
+  id: string
+  title: string
+  category: string
+  topic: string
+  difficulty: FunDifficulty
+  language: FunLanguage
+  questions: FunQuestion[]
+  source: "ai" | "starter"
+  createdAt: ISODateTime
+  plays: number
+  /** Best score in percent. */
+  best?: number
+}
+
+export interface FunCategoryStats {
+  games: number
+  answered: number
+  correct: number
+}
+
+export interface FunStats {
+  xp: number
+  games: number
+  answered: number
+  correct: number
+  bestCombo: number
+  /** Consecutive days with at least one game. */
+  dayStreak: number
+  lastPlayed?: DateString
+  categories: Record<string, FunCategoryStats>
+}

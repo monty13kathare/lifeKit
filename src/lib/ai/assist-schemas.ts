@@ -179,6 +179,32 @@ export const ASSIST_OUTPUT = {
       .min(1)
       .max(10),
   }),
+  /** Input JSON: { category, topic, difficulty, count, language: "en"|"hi"|"both", avoid?: string[] } */
+  "fun-quiz": z.object({
+    title: z.string().max(120),
+    questions: z
+      .array(
+        z.object({
+          story: z.string().max(1500).optional(),
+          question: z.string().min(1).max(1000),
+          options: z.array(z.string().min(1).max(200)).length(4),
+          answerIndex: z.number().int().min(0).max(3),
+          hint: z.string().max(300).optional(),
+          explanation: z.string().max(800),
+          /** Only in "both" mode: Hindi translation (options in the same order). */
+          hindi: z
+            .object({
+              story: z.string().max(2000).optional(),
+              question: z.string().max(1200),
+              options: z.array(z.string().max(240)).max(4),
+              explanation: z.string().max(1000),
+            })
+            .optional(),
+        })
+      )
+      .min(1)
+      .max(10),
+  }),
   /** Input JSON: { category, difficulty } */
   "logic-puzzle": z.object({
     title: z.string().max(120),

@@ -15,7 +15,6 @@ import {
   LayoutGrid,
   Shrink,
   MoreHorizontal,
-  Star,
   File,
   MoreVertical,
   Repeat,
@@ -178,7 +177,6 @@ export function Dashboard() {
       if (activeFilter === "Notes") return item.type === "Note"
       if (activeFilter === "Tasks") return item.type === "Task"
       if (activeFilter === "Links") return item.type === "Bookmark"
-      if (activeFilter === "Favorites") return (item as any).pinned
       return true
     })
     .slice(0, 5)
@@ -290,16 +288,12 @@ export function Dashboard() {
         <div className="mt-8">
           <div className="mb-4 flex items-center justify-between px-1">
             <h3 className="text-lg font-bold text-foreground tracking-tight">Recent Activity</h3>
-            <Link href="/tools" className="text-xs font-bold text-primary hover:text-primary/80 transition-colors tracking-tight">
-              See All
-            </Link>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar px-1 -mx-1">
             <FilterChip label="All" active={activeFilter === "All"} onClick={() => setActiveFilter("All")} />
             <FilterChip label="Notes" active={activeFilter === "Notes"} onClick={() => setActiveFilter("Notes")} />
             <FilterChip label="Tasks" active={activeFilter === "Tasks"} onClick={() => setActiveFilter("Tasks")} />
             <FilterChip label="Links" active={activeFilter === "Links"} onClick={() => setActiveFilter("Links")} />
-            <FilterChip label="Favorites" icon={Star} active={activeFilter === "Favorites"} onClick={() => setActiveFilter("Favorites")} />
           </div>
           <div className="mt-4 flex flex-col gap-3">
             {!hydrated ? (
