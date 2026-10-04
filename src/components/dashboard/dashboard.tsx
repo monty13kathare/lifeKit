@@ -17,34 +17,59 @@ import {
   Star,
   File,
   MoreVertical,
-  Repeat,
-  Search
+  Repeat
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+const COLOR_STYLES = {
+  rose: { icon: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10", glow: "bg-rose-500" },
+  blue: { icon: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10", glow: "bg-blue-500" },
+  emerald: { icon: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", glow: "bg-emerald-500" },
+  purple: { icon: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500/10", glow: "bg-purple-500" },
+  orange: { icon: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/10", glow: "bg-orange-500" },
+  pink: { icon: "text-pink-600 dark:text-pink-400", bg: "bg-pink-500/10", glow: "bg-pink-500" },
+  indigo: { icon: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-500/10", glow: "bg-indigo-500" },
+  slate: { icon: "text-slate-600 dark:text-slate-400", bg: "bg-slate-500/10", glow: "bg-slate-500" },
+  sky: { icon: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10", glow: "bg-sky-500" },
+  violet: { icon: "text-violet-600 dark:text-violet-400", bg: "bg-violet-500/10", glow: "bg-violet-500" },
+  amber: { icon: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", glow: "bg-amber-500" },
+}
+
 function ToolCard({
   icon: Icon,
-  iconBg,
+  color,
   title,
   desc,
+  href,
 }: {
   icon: React.ElementType
-  iconBg: string
+  color: keyof typeof COLOR_STYLES
   title: string
   desc: string
+  href: string
 }) {
+  const styles = COLOR_STYLES[color]
+
   return (
-    <button className="flex flex-col items-center justify-center rounded-[1.25rem] bg-card p-3 shadow-soft transition-transform active:scale-95 sm:p-4 hover:border-primary/40 border border-transparent">
-      <div className={cn("mb-2.5 flex size-12 items-center justify-center rounded-2xl sm:size-14", iconBg)}>
-        <Icon className="size-6 sm:size-7" strokeWidth={2.5} />
+    <Link href={href} className="group relative flex flex-col items-center justify-center rounded-[1.25rem] bg-card py-2.5 px-1 sm:p-3 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-95 border border-border/40 overflow-hidden">
+      {/* Top ambient glow */}
+      <div className={cn("absolute inset-x-0 -top-6 h-20 opacity-[0.12] dark:opacity-[0.15] blur-xl transition-opacity group-hover:opacity-[0.18]", styles.glow)} />
+      
+      <div className="relative mb-2 flex flex-col items-center justify-center">
+        {/* Glow behind icon container */}
+        <div className={cn("absolute inset-0 blur-lg opacity-25 dark:opacity-30", styles.glow)} />
+        {/* Icon container */}
+        <div className={cn("relative flex size-10 items-center justify-center rounded-[12px] sm:size-12 sm:rounded-[14px]", styles.bg)}>
+          <Icon className={cn("size-[18px] sm:size-5", styles.icon)} strokeWidth={2.25} />
+        </div>
       </div>
-      <span className="text-center text-[11px] font-bold text-foreground sm:text-xs tracking-tight leading-tight">
+      <span className="relative text-center text-[10.5px] font-bold text-foreground sm:text-xs tracking-tight leading-tight z-10 px-1">
         {title}
       </span>
-      <span className="mt-1 text-center text-[9px] font-medium text-muted-foreground sm:text-[10px]">
+      <span className="relative mt-0.5 text-center text-[9px] font-medium text-muted-foreground sm:text-[10px] z-10">
         {desc}
       </span>
-    </button>
+    </Link>
   )
 }
 
@@ -139,9 +164,6 @@ export function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button className="flex size-10 items-center justify-center rounded-full bg-card text-foreground shadow-soft hover:bg-muted transition-colors border border-border/50">
-              <Search className="size-[18px]" strokeWidth={2.5} />
-            </button>
             <ThemeToggle />
             <ProfileMenu />
           </div>
@@ -171,9 +193,9 @@ export function Dashboard() {
             <p className="mt-2 text-xs font-medium text-blue-50 opacity-90 sm:text-sm drop-shadow">
               All your files, in one place.
             </p>
-            <button className="mt-6 flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-xs font-bold text-blue-700 shadow-lg hover:bg-blue-50 transition-colors sm:text-sm">
+            <Link href="/" className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-xs font-bold text-blue-700 shadow-lg hover:bg-blue-50 transition-colors sm:text-sm">
               Explore Tools <ArrowRight className="size-[14px]" strokeWidth={2.5} />
-            </button>
+            </Link>
           </div>
         </div>
 
@@ -185,54 +207,62 @@ export function Dashboard() {
               View All <ChevronRight className="size-3" strokeWidth={3} />
             </button>
           </div>
-          <div className="grid grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
+          <div className="grid grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
             <ToolCard
               icon={FileText}
-              iconBg="bg-red-500/10 text-red-600 dark:text-red-400"
-              title="PDF Editor"
-              desc="Edit, Annotate"
+              color="rose"
+              title="Text to PDF"
+              desc="Notes to PDF"
+              href="/tools/text-to-pdf"
             />
             <ToolCard
               icon={ImageIcon}
-              iconBg="bg-blue-500/10 text-blue-600 dark:text-blue-400"
-              title="Image Editor"
-              desc="Crop, Resize"
+              color="blue"
+              title="Image to PDF"
+              desc="Convert Images"
+              href="/tools/image-to-pdf"
             />
             <ToolCard
               icon={Scan}
-              iconBg="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-              title="Scanner"
-              desc="Scan to PDF"
+              color="emerald"
+              title="OCR"
+              desc="Extract Text"
+              href="/tools/ocr"
             />
             <ToolCard
               icon={Repeat}
-              iconBg="bg-purple-500/10 text-purple-600 dark:text-purple-400"
-              title="File Sharing"
-              desc="Send & Receive"
+              color="sky"
+              title="Resize Image"
+              desc="Dimensions"
+              href="/tools/image-resizer"
             />
             <ToolCard
               icon={RefreshCw}
-              iconBg="bg-orange-500/10 text-orange-600 dark:text-orange-400"
-              title="Convert"
-              desc="PDF, Image, Docs"
+              color="violet"
+              title="AI Writer"
+              desc="Draft & Edit"
+              href="/tools/ai-writer"
             />
             <ToolCard
               icon={LayoutGrid}
-              iconBg="bg-pink-500/10 text-pink-600 dark:text-pink-400"
-              title="Merge & Split"
-              desc="Combine Files"
+              color="pink"
+              title="Summarizer"
+              desc="TL;DR Text"
+              href="/tools/summarizer"
             />
             <ToolCard
               icon={Shrink}
-              iconBg="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-              title="Compress"
-              desc="Reduce Size"
+              color="amber"
+              title="SecureShare"
+              desc="Private Links"
+              href="/tools/secure-share"
             />
             <ToolCard
               icon={MoreHorizontal}
-              iconBg="bg-slate-500/10 text-slate-600 dark:text-slate-400"
+              color="slate"
               title="More Tools"
               desc="Find More"
+              href="/"
             />
           </div>
         </div>

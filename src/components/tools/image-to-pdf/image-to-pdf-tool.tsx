@@ -66,8 +66,8 @@ export function ImageToPdfTool() {
   const resultRef = useRef<HTMLDivElement>(null)
 
   const inputKey = useMemo(
-    () => JSON.stringify([items.map((i) => [i.id, i.rotation]), pageSize, orientation, margin]),
-    [items, pageSize, orientation, margin]
+    () => JSON.stringify([items.map((i) => [i.id, i.rotation]), pageSize, orientation, margin, fileName]),
+    [items, pageSize, orientation, margin, fileName]
   )
   const stale = result !== null && result.key !== inputKey
   const loadingThumbs = items.some((i) => !i.thumb)
@@ -247,7 +247,7 @@ export function ImageToPdfTool() {
             />
           ) : (
             <Notice tone="info" title="Preview isn't available in this browser">
-              Mobile browsers often can&apos;t show PDFs inline. Use Download, or Open to view it in your PDF app.
+              Your browser doesn't support inline PDF previews. Use the Download or Open buttons above to view the generated document.
             </Notice>
           )}
         </motion.section>
