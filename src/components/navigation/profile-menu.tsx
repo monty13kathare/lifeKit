@@ -33,8 +33,8 @@ export function ProfileMenu() {
       <DropdownMenuTrigger
         render={<Button variant="ghost" size="icon" className="rounded-full" aria-label="Profile menu" />}
       >
-        <span className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-          {name ? initials(name) : <UserRound className="size-4" />}
+        <span className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary overflow-hidden ring-1 ring-border shadow-sm">
+          <img src="https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200&h=200&fit=crop" alt={name || "Profile"} className="size-full object-cover" />
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">

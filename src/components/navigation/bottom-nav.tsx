@@ -8,8 +8,7 @@ import { activeNavHref, MOBILE_NAV } from "./nav-config"
 
 export function BottomNav() {
   const pathname = usePathname()
-  // Learn has no bottom-bar slot on mobile; it lives under More.
-  const active = activeNavHref(pathname) === "/learn" ? "/more" : activeNavHref(pathname)
+  const active = activeNavHref(pathname)
 
   return (
     <nav
@@ -61,7 +60,7 @@ export function BottomNav() {
 
                 <span
                   className={cn(
-                    "text-[10px] tracking-tight transition-all",
+                    "text-[9px] sm:text-[10px] tracking-tight transition-all",
                     isActive ? "font-bold text-[#6D4AFF]" : "font-medium text-slate-500"
                   )}
                 >

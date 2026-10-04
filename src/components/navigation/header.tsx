@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation"
 
 export function Header() {
   const pathname = usePathname()
-  if (pathname === "/") return null
+
 
   return (
     <header className="sticky top-0 z-30 border-b bg-background/85 pt-safe backdrop-blur-lg supports-backdrop-filter:bg-background/70">

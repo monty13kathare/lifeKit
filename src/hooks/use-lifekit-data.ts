@@ -19,7 +19,7 @@ import {
   healthProfileStore,
 } from "@/lib/storage"
 import type { HealthProfile, Settings } from "@/types"
-import { DEFAULT_LEARN_STATE, learnStore } from "@/lib/learn/progress"
+
 import { useStore } from "./use-store"
 
 /*
@@ -107,19 +107,6 @@ function pickMutations<S extends { add: unknown; update: unknown; remove: unknow
 
 
 
-export function useLearn() {
-  const stored = useStore(learnStore)
-  const state = useMemo(
-    () => ({
-      ...DEFAULT_LEARN_STATE,
-      ...stored,
-      xp: { ...DEFAULT_LEARN_STATE.xp, ...stored.xp },
-      streak: { ...DEFAULT_LEARN_STATE.streak, ...stored.streak },
-    }),
-    [stored]
-  )
-  return state
-}
 
 export function useGoals() {
   const goals = useStore(goalsStore)

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { ThemeToggle } from "@/components/navigation/theme-toggle"
 import { ProfileMenu } from "@/components/navigation/profile-menu"
@@ -17,9 +18,13 @@ import {
   Star,
   File,
   MoreVertical,
-  Repeat
+  Repeat,
+  ListTodo,
+  Bookmark
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useNotes, useTasks, useBookmarks } from "@/hooks/use-lifekit-data"
+import { useHydrated } from "@/hooks/use-store"
 
 const COLOR_STYLES = {
   rose: { icon: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10", glow: "bg-rose-500" },
@@ -51,22 +56,28 @@ function ToolCard({
   const styles = COLOR_STYLES[color]
 
   return (
-    <Link href={href} className="group relative flex flex-col items-center justify-center rounded-[1.25rem] bg-card py-2.5 px-1 sm:p-3 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-95 border border-border/40 overflow-hidden">
-      {/* Top ambient glow */}
-      <div className={cn("absolute inset-x-0 -top-6 h-20 opacity-[0.12] dark:opacity-[0.15] blur-xl transition-opacity group-hover:opacity-[0.18]", styles.glow)} />
+    <Link href={href} className="group relative flex flex-col items-center justify-center rounded-[1.25rem] bg-card p-2 sm:p-3 shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-95 border border-border/40 overflow-hidden aspect-square sm:aspect-auto sm:min-h-[110px]">
       
-      <div className="relative mb-2 flex flex-col items-center justify-center">
-        {/* Glow behind icon container */}
-        <div className={cn("absolute inset-0 blur-lg opacity-25 dark:opacity-30", styles.glow)} />
+      {/* LIGHT MODE: Soft large pastel background block */}
+      <div className={cn("absolute inset-x-2 top-2 bottom-12 rounded-[1rem] opacity-100 dark:opacity-0 transition-opacity", styles.bg)} />
+
+      {/* DARK MODE: Top ambient glow */}
+      <div className={cn("absolute inset-x-0 -top-4 h-16 blur-xl opacity-0 dark:opacity-[0.15] transition-opacity group-hover:dark:opacity-[0.2]", styles.glow)} />
+      
+      <div className="relative mb-1 sm:mb-2 flex flex-col items-center justify-center">
+        {/* DARK MODE: Glow behind icon container */}
+        <div className={cn("absolute inset-0 blur-md opacity-0 dark:opacity-30", styles.glow)} />
+        
         {/* Icon container */}
-        <div className={cn("relative flex size-10 items-center justify-center rounded-[12px] sm:size-12 sm:rounded-[14px]", styles.bg)}>
-          <Icon className={cn("size-[18px] sm:size-5", styles.icon)} strokeWidth={2.25} />
+        <div className={cn("relative flex size-10 items-center justify-center rounded-xl sm:size-[42px] sm:rounded-2xl", styles.bg)}>
+          <Icon className={cn("size-5 sm:size-[22px]", styles.icon)} strokeWidth={2} />
         </div>
       </div>
-      <span className="relative text-center text-[10.5px] font-bold text-foreground sm:text-xs tracking-tight leading-tight z-10 px-1">
+      
+      <span className="relative text-center text-[10px] font-bold text-foreground sm:text-[11.5px] tracking-tight leading-tight z-10 px-0.5">
         {title}
       </span>
-      <span className="relative mt-0.5 text-center text-[9px] font-medium text-muted-foreground sm:text-[10px] z-10">
+      <span className="relative mt-0.5 text-center text-[8px] font-medium text-muted-foreground sm:text-[9.5px] z-10 hidden sm:block">
         {desc}
       </span>
     </Link>
@@ -77,13 +88,16 @@ function FilterChip({
   label,
   active,
   icon: Icon,
+  onClick,
 }: {
   label: string
   active?: boolean
   icon?: React.ElementType
+  onClick?: () => void
 }) {
   return (
     <button
+      onClick={onClick}
       className={cn(
         "flex shrink-0 items-center gap-1.5 rounded-full px-4 py-1.5 text-[11px] font-bold sm:text-xs transition-colors",
         active
@@ -104,6 +118,7 @@ function FileItem({
   icon: Icon,
   color,
   image,
+  href = "#",
 }: {
   name: string
   size: string
@@ -111,9 +126,10 @@ function FileItem({
   icon: React.ElementType
   color: string
   image?: string
+  href?: string
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-card p-3 shadow-soft sm:p-4 border border-border/50">
+    <Link href={href} className="flex items-center gap-3 rounded-2xl bg-card p-3 shadow-soft sm:p-4 border border-border/50 hover:bg-muted/50 transition-colors">
       <div
         className={cn(
           "flex size-12 shrink-0 items-center justify-center rounded-xl overflow-hidden",
@@ -136,41 +152,44 @@ function FileItem({
       <button className="flex size-8 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground">
         <MoreVertical className="size-5" />
       </button>
-    </div>
+    </Link>
   )
 }
 
 export function Dashboard() {
+  const [activeFilter, setActiveFilter] = useState("All")
+  const hydrated = useHydrated()
+  const { notes } = useNotes()
+  const { tasks } = useTasks()
+  const { bookmarks } = useBookmarks()
+
+  const recentItems = hydrated
+    ? [
+        ...notes.map((n) => ({ ...n, type: "Note", icon: FileText, color: "bg-rose-500/10 text-rose-600 dark:text-rose-400", href: "/tools/notes" })),
+        ...tasks.map((t) => ({ ...t, type: "Task", icon: ListTodo, color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400", href: "/tools/todo" })),
+        ...bookmarks.map((b) => ({ ...b, type: "Bookmark", icon: Bookmark, color: "bg-teal-500/10 text-teal-600 dark:text-teal-400", href: "/tools/bookmarks" })),
+      ]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    : []
+
+  const filteredItems = recentItems
+    .filter((item) => {
+      if (activeFilter === "All") return true
+      if (activeFilter === "Notes") return item.type === "Note"
+      if (activeFilter === "Tasks") return item.type === "Task"
+      if (activeFilter === "Links") return item.type === "Bookmark"
+      if (activeFilter === "Favorites") return (item as any).pinned
+      return true
+    })
+    .slice(0, 5)
+
   return (
-    <div className="min-h-screen px-4 pt-4 sm:px-6 md:px-8 pb-32 font-sans">
+    <div className="min-h-screen pb-32 font-sans">
       <div className="mx-auto max-w-4xl">
-        {/* Header */}
-        <header className="flex items-center justify-between py-2">
-          <div className="flex items-center gap-3">
-            <div className="size-11 overflow-hidden rounded-full bg-muted border-2 border-background shadow-sm ring-2 ring-border">
-              <img
-                src="https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200&h=200&fit=crop"
-                alt="Arvind"
-                className="size-full object-cover"
-              />
-            </div>
-            <div>
-              <h1 className="flex items-center gap-1.5 text-base font-bold text-foreground sm:text-lg tracking-tight">
-                Hi, Arvind <span className="text-xl drop-shadow-sm">👋</span>
-              </h1>
-              <p className="text-[11px] font-medium text-muted-foreground sm:text-xs">
-                Your all-in-one file toolkit
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <ProfileMenu />
-          </div>
-        </header>
+
 
         {/* Banner */}
-        <div className="relative mt-6 overflow-hidden rounded-[2rem] bg-gradient-to-r from-[#215DF1] via-[#6159FF] to-[#FFA0D9] p-6 text-white shadow-xl sm:p-8">
+        <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-r from-[#215DF1] via-[#6159FF] to-[#FFA0D9] p-6 text-white shadow-xl sm:p-8">
           {/* Decorative floating elements */}
           <div className="absolute -right-4 -top-8 size-64 rounded-full bg-white/10 blur-3xl" />
           <div className="absolute -bottom-16 right-16 size-48 rounded-full bg-pink-400/30 blur-2xl" />
@@ -203,9 +222,9 @@ export function Dashboard() {
         <div className="mt-8">
           <div className="mb-4 flex items-center justify-between px-1">
             <h3 className="text-lg font-bold text-foreground tracking-tight">Popular Tools</h3>
-            <button className="flex items-center gap-0.5 rounded-full bg-card px-3 py-1.5 text-[10px] font-bold text-muted-foreground shadow-soft hover:text-foreground transition-colors border border-border/50">
+            <Link href="/tools" className="flex items-center gap-0.5 rounded-full bg-card px-3 py-1.5 text-[10px] font-bold text-muted-foreground shadow-soft hover:text-foreground transition-colors border border-border/50">
               View All <ChevronRight className="size-3" strokeWidth={3} />
-            </button>
+            </Link>
           </div>
           <div className="grid grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
             <ToolCard
@@ -262,7 +281,7 @@ export function Dashboard() {
               color="slate"
               title="More Tools"
               desc="Find More"
-              href="/"
+              href="/tools"
             />
           </div>
         </div>
@@ -270,49 +289,36 @@ export function Dashboard() {
         {/* Recent Files */}
         <div className="mt-8">
           <div className="mb-4 flex items-center justify-between px-1">
-            <h3 className="text-lg font-bold text-foreground tracking-tight">Recent Files</h3>
-            <button className="text-xs font-bold text-primary hover:text-primary/80 transition-colors tracking-tight">
+            <h3 className="text-lg font-bold text-foreground tracking-tight">Recent Activity</h3>
+            <Link href="/tools" className="text-xs font-bold text-primary hover:text-primary/80 transition-colors tracking-tight">
               See All
-            </button>
+            </Link>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar px-1 -mx-1">
-            <FilterChip label="All" active />
-            <FilterChip label="PDF" />
-            <FilterChip label="Images" />
-            <FilterChip label="Scans" />
-            <FilterChip label="Shared" />
-            <FilterChip label="Favorites" icon={Star} />
+            <FilterChip label="All" active={activeFilter === "All"} onClick={() => setActiveFilter("All")} />
+            <FilterChip label="Notes" active={activeFilter === "Notes"} onClick={() => setActiveFilter("Notes")} />
+            <FilterChip label="Tasks" active={activeFilter === "Tasks"} onClick={() => setActiveFilter("Tasks")} />
+            <FilterChip label="Links" active={activeFilter === "Links"} onClick={() => setActiveFilter("Links")} />
+            <FilterChip label="Favorites" icon={Star} active={activeFilter === "Favorites"} onClick={() => setActiveFilter("Favorites")} />
           </div>
           <div className="mt-4 flex flex-col gap-3">
-            <FileItem
-              name="Project Proposal.pdf"
-              size="2.4 MB"
-              date="Today, 9:30 AM"
-              icon={FileText}
-              color="bg-red-500/10 text-red-600 dark:text-red-400"
-            />
-            <FileItem
-              name="IMG_2026.jpg"
-              size="1.8 MB"
-              date="Today, 8:12 AM"
-              icon={ImageIcon}
-              color="bg-blue-500/10 text-blue-600 dark:text-blue-400"
-              image="https://images.unsplash.com/photo-1506744626753-1fa28f67cbbf?w=400&h=400&fit=crop"
-            />
-            <FileItem
-              name="Notes Document.docx"
-              size="420 KB"
-              date="Yesterday, 6:45 PM"
-              icon={File}
-              color="bg-blue-500/10 text-blue-600 dark:text-blue-400"
-            />
-            <FileItem
-              name="Scanned_Receipt.pdf"
-              size="1.2 MB"
-              date="Aug 2, 2026"
-              icon={FileText}
-              color="bg-slate-500/10 text-slate-600 dark:text-slate-400"
-            />
+            {!hydrated ? (
+              <div className="p-4 text-center text-sm text-muted-foreground animate-pulse">Loading recent activity...</div>
+            ) : filteredItems.length === 0 ? (
+              <div className="p-4 text-center text-sm text-muted-foreground">No recent activity yet.</div>
+            ) : (
+              filteredItems.map((item) => (
+                <FileItem
+                  key={item.id}
+                  name={item.title}
+                  size={item.type}
+                  date={new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(new Date(item.createdAt))}
+                  icon={item.icon}
+                  color={item.color}
+                  href={item.href}
+                />
+              ))
+            )}
           </div>
         </div>
       </div>
