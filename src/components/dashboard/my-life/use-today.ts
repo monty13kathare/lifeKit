@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { addDays, format, isSameDay, startOfDay } from "date-fns"
-import { useCalendar, useFocus, useReminders, useRoutines, useTasks } from "@/hooks/use-lifekit-data"
+import { useCalendar, useReminders, useRoutines, useTasks } from "@/hooks/use-lifekit-data"
 import { combineDateTime, expandEvents, formatTime12, todayString } from "@/lib/dates"
 import { nextOccurrence } from "@/lib/reminders"
 
@@ -33,7 +33,6 @@ export function useToday(now: Date) {
   const { events } = useCalendar()
   const { routines } = useRoutines()
   const { reminders } = useReminders()
-  const { sessions, settings: focusSettings } = useFocus()
   const minuteKey = format(now, "yyyy-MM-dd HH:mm")
 
   return useMemo(() => {
@@ -50,9 +49,6 @@ export function useToday(now: Date) {
     const routineDone = routineToday.filter((r) => r.completedDates.includes(today)).length
 
     const eventOccurrences = expandEvents(events, dayStart, dayEnd)
-    const focusMinutesToday = sessions
-      .filter((s) => s.phase === "focus" && s.endedAt.slice(0, 10) === today)
-      .reduce((sum, s) => sum + s.minutes, 0)
 
     const items: AgendaItem[] = []
     for (const o of eventOccurrences) {
@@ -127,12 +123,10 @@ export function useToday(now: Date) {
       routineDone,
       eventOccurrences,
       nextEvent,
-      focusMinutesToday,
-      focusGoal: focusSettings.dailyGoalMinutes,
       items,
       untimedTasks,
     }
     // minuteKey re-evaluates time-dependent parts once a minute.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, events, routines, reminders, sessions, focusSettings, minuteKey])
+  }, [tasks, events, routines, reminders, minuteKey])
 }

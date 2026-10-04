@@ -4,13 +4,12 @@ import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { addDays, format, startOfDay } from "date-fns"
 import { motion } from "framer-motion"
-import { CalendarDays, ListTodo, Sunrise, Timer } from "lucide-react"
+import { CalendarDays, ListTodo, Sunrise } from "lucide-react"
 import { CATEGORY_META, LIFE_CATEGORY_ORDER, toolsByCategory, type Tool } from "@/data/tools"
 import { useAiStatus } from "@/hooks/use-ai-status"
-import { useBookmarks, useCalendar, useFocus, useImportantInformation, useNotes, useReminders, useWellness } from "@/hooks/use-lifekit-data"
+import { useBookmarks, useCalendar, useNotes, useReminders, useWellness } from "@/hooks/use-lifekit-data"
 import { useHydrated } from "@/hooks/use-store"
 import { expandEvents, greeting } from "@/lib/dates"
-import { formatClock, PHASE_LABEL, remainingMs } from "@/lib/focus"
 import { nextOccurrence } from "@/lib/reminders"
 import { cn } from "@/lib/utils"
 import { DayPlanner } from "./my-life/day-planner"
@@ -30,22 +29,17 @@ function useNow(intervalMs = 30_000) {
   return now
 }
 
-function formatMinutes(min: number) {
-  if (min < 60) return `${min}m`
-  return `${Math.floor(min / 60)}h${min % 60 ? ` ${min % 60}m` : ""}`
-}
+
 
 export function MyLife() {
   const hydrated = useHydrated()
   const now = useNow()
   const ai = useAiStatus()
   const today = useToday(now)
-  const { timer } = useFocus()
   const { events } = useCalendar()
   const { reminders } = useReminders()
   const { notes } = useNotes()
   const { bookmarks } = useBookmarks()
-  const { items: infoItems } = useImportantInformation()
   const { days, goals } = useWellness()
 
   const stats = useMemo<Record<string, string>>(() => {
@@ -64,16 +58,11 @@ export function MyLife() {
       "routine-planner": today.routineToday.length ? `${today.routineDone}/${today.routineToday.length} done today` : "No routine today",
       calendar: weekEvents.length ? `${plural(weekEvents.length, "event")} this week` : "Calendar is clear",
       reminders: nextReminder ? `Next: ${format(nextReminder, "EEE h:mm a")}` : "No upcoming reminders",
-      focus:
-        timer.status !== "idle"
-          ? `${PHASE_LABEL[timer.phase]} · ${formatClock(remainingMs(timer, now.getTime()))} left`
-          : `${formatMinutes(today.focusMinutesToday)} of ${formatMinutes(today.focusGoal)} today`,
       notes: notes.length ? `${plural(notes.length, "note")}${pinned ? ` · ${pinned} pinned` : ""}` : "No notes yet",
       wellness: `${water}/${goals.waterGlasses} glasses of water today`,
       bookmarks: bookmarks.length ? plural(bookmarks.length, "saved link") : "No bookmarks yet",
-      "important-information": infoItems.length ? plural(infoItems.length, "entry", "entries") : "Nothing saved yet",
     }
-  }, [events, reminders, days, notes, bookmarks, infoItems, goals, timer, today, now])
+  }, [events, reminders, days, notes, bookmarks, goals, today, now])
 
   const strip = [
     {
@@ -92,14 +81,7 @@ export function MyLife() {
       icon: Sunrise,
       hint: "completed",
     },
-    {
-      label: "Focus",
-      value: formatMinutes(today.focusMinutesToday),
-      pct: today.focusGoal ? Math.min(1, today.focusMinutesToday / today.focusGoal) : 0,
-      href: "/tools/focus",
-      icon: Timer,
-      hint: `goal ${formatMinutes(today.focusGoal)}`,
-    },
+
     {
       label: "Next event",
       value: today.nextEvent ? format(today.nextEvent.start, "h:mm a") : "—",
@@ -165,7 +147,7 @@ export function MyLife() {
             >
               {toolsByCategory(category).map((tool) => (
                 <motion.li key={tool.id} variants={{ hidden: { opacity: 0, y: 8 }, show: { opacity: 1, y: 0 } }}>
-                  <LifeTile tool={tool} stat={stats[tool.id]} hydrated={hydrated} live={tool.id === "focus" && timer.status === "running"} />
+                  <LifeTile tool={tool} stat={stats[tool.id]} hydrated={hydrated} />
                 </motion.li>
               ))}
             </motion.ul>

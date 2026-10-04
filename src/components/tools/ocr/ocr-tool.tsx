@@ -40,7 +40,7 @@ import { takeOcrHandoff } from "@/lib/qr/session"
 import { saveNote } from "@/lib/storage/notes"
 import { cn } from "@/lib/utils"
 import { OcrCamera } from "./ocr-camera"
-import { OCR_LANGUAGES, OcrEngine, languageOf, preprocess, toCanvas, type OcrProgress, type Preprocess } from "./ocr-engine"
+import { OCR_LANGUAGES, languageOf, preprocess, toCanvas, type OcrProgress, type Preprocess } from "./ocr-engine"
 
 type PdfDoc = Awaited<ReturnType<typeof openPdf>>
 
@@ -79,7 +79,6 @@ export function OcrTool() {
   const [confidence, setConfidence] = useState<number | null>(null)
   const [editing, setEditing] = useState(false)
   const [speaking, setSpeaking] = useState(false)
-  const engineRef = useRef<OcrEngine | null>(null)
   const textRef = useRef<HTMLTextAreaElement>(null)
   const pdfRef = useRef<PdfDoc | null>(null)
   const speechSupported = useSpeechSupported()
@@ -88,18 +87,36 @@ export function OcrTool() {
 
   const run = useCallback(
     async (canvas: HTMLCanvasElement, opts: { langs: string[]; pre: Preprocess }) => {
-      if (!engineRef.current) {
-        engineRef.current = new OcrEngine()
-        engineRef.current.setProgressHandler(setProgress)
-      }
       setPhase("running")
       setOcrError(null)
       setEditing(false)
-      setProgress({ status: "Preparing image", progress: 0 })
+      setProgress({ status: "Preparing image...", progress: 0 })
       try {
         await new Promise((r) => setTimeout(r, 0))
         const input = preprocess(canvas, opts.pre)
-        const result = await engineRef.current.recognize(input, opts.langs)
+        
+        setProgress({ status: "Extracting text with AI...", progress: 0.5 })
+
+        const blob = await new Promise<Blob>((resolve, reject) => {
+          input.toBlob((b) => (b ? resolve(b) : reject(new Error("Failed to create blob"))), "image/jpeg", 0.9)
+        })
+
+        const formData = new FormData()
+        formData.append("image", blob, "image.jpg")
+        formData.append("lang", opts.langs[0])
+
+        const res = await fetch("/api/ai/ocr", {
+          method: "POST",
+          body: formData,
+        })
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error || "Failed to extract text.")
+        }
+
+        const result = await res.json()
+
         setText(result.text.trim())
         setConfidence(result.confidence)
         setPhase("done")
@@ -108,9 +125,7 @@ export function OcrTool() {
         console.error(e)
         setPhase("error")
         setOcrError(
-          navigator.onLine
-            ? "Text recognition failed. Try a clearer image or a different language."
-            : "You're offline and the OCR engine or language data isn't cached yet. Connect once to download it."
+          e instanceof Error ? e.message : "Text recognition failed. Try a clearer image."
         )
       }
     },
@@ -128,10 +143,9 @@ export function OcrTool() {
     })
   }, [run])
 
-  // Clean up: workers, speech, PDF documents.
+  // Clean up: speech, PDF documents.
   useEffect(() => {
     return () => {
-      void engineRef.current?.terminate()
       if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel()
       void pdfRef.current?.destroy()
     }
@@ -377,7 +391,7 @@ export function OcrTool() {
             <Switch id="ocr-contrast" checked={pre.contrast} onCheckedChange={(c) => setPre((p) => ({ ...p, contrast: c }))} />
           </div>
           <p className="text-xs text-muted-foreground">
-            Language data downloads once from the OCR engine&apos;s CDN and is cached; your image never leaves your device.
+            Image is processed by AI. Please ensure you have internet access.
           </p>
           <Button size="lg" className="w-full" disabled={!source || running || !!loadingInput} onClick={() => source && void run(source.canvas, { langs, pre })}>
             {running ? <Loader2 className="animate-spin" aria-hidden /> : phase === "done" ? <RotateCcw aria-hidden /> : <ScanText aria-hidden />}
@@ -398,7 +412,7 @@ export function OcrTool() {
                 <ProgressLabel>{progress.status || "Working…"}</ProgressLabel>
                 <ProgressValue>{() => `${pct}%`}</ProgressValue>
               </Progress>
-              <p className="mt-3 text-xs text-muted-foreground">The first run downloads the OCR engine and language data (a few MB). Later runs are faster.</p>
+              <p className="text-xs text-muted-foreground">Extracting text using Gemini Vision API...</p>
             </div>
           ) : null}
           {phase === "error" && ocrError ? <Notice tone="danger" title="Couldn't read text">{ocrError}</Notice> : null}

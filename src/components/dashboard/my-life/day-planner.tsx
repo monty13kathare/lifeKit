@@ -27,7 +27,6 @@ function planInput(t: Today, now: Date): string {
       time: o.event.allDay ? "all day" : `${format(o.start, "h:mm a")}–${format(o.end, "h:mm a")}`,
     })),
     routine: t.routineToday.map((r) => ({ title: r.title, time: r.time, minutes: r.durationMinutes, done: r.completedDates.includes(t.today) })),
-    focus: { goalMinutes: t.focusGoal, doneMinutes: t.focusMinutesToday },
   })
 }
 

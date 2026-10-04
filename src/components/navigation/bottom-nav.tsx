@@ -32,22 +32,13 @@ export function BottomNav() {
                 >
                   <span
                     className={cn(
-                      "flex size-12 items-center justify-center rounded-2xl text-white shadow-md transition-all group-hover:scale-105 group-hover:shadow-lg ring-4 ring-background",
-                      isActive
-                        ? "bg-gradient-to-tr from-emerald-500 via-teal-500 to-emerald-600 shadow-emerald-500/40 group-hover:shadow-emerald-500/50"
-                        : "bg-gradient-to-tr from-emerald-600 via-teal-500 to-emerald-500 shadow-emerald-500/35 group-hover:shadow-emerald-500/45"
+                      "flex size-14 items-center justify-center rounded-full text-white shadow-lg transition-all group-hover:scale-105 ring-[6px] ring-background",
+                      "bg-[#6D4AFF] shadow-[#6D4AFF]/40"
                     )}
                   >
                     <Icon className="size-6" aria-hidden />
                   </span>
-                  <span
-                    className={cn(
-                      "mt-1 text-[10px] font-semibold transition-colors",
-                      isActive ? "text-emerald-600 dark:text-emerald-400" : "text-foreground/80 group-hover:text-emerald-500"
-                    )}
-                  >
-                    {label}
-                  </span>
+
                 </Link>
               </li>
             )
@@ -60,33 +51,27 @@ export function BottomNav() {
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "group relative flex h-14 flex-col items-center justify-center gap-1 transition-all active:scale-95",
-                  isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  isActive ? "text-[#6D4AFF]" : "text-slate-400 hover:text-slate-600"
                 )}
               >
                 {/* Active Indicator Background */}
-                <div
-                  className={cn(
-                    "flex h-7 w-11 items-center justify-center rounded-xl transition-all",
-                    isActive ? "bg-primary/15 text-primary" : "text-muted-foreground group-hover:text-foreground"
-                  )}
-                >
-                  <Icon className="size-4.5 transition-transform group-hover:scale-110" aria-hidden />
+                <div className="flex h-7 items-center justify-center transition-all">
+                  <Icon className="size-5 transition-transform group-hover:scale-110" strokeWidth={isActive ? 2.5 : 2} aria-hidden />
                 </div>
 
                 <span
                   className={cn(
                     "text-[10px] tracking-tight transition-all",
-                    isActive ? "font-bold text-primary" : "font-medium text-muted-foreground"
+                    isActive ? "font-bold text-[#6D4AFF]" : "font-medium text-slate-500"
                   )}
                 >
                   {label}
                 </span>
 
-                {/* Subtle active pip */}
                 {isActive && (
                   <motion.span
                     layoutId="active-nav-dot"
-                    className="absolute -bottom-0.5 size-1 rounded-full bg-primary"
+                    className="absolute -bottom-1 size-1 rounded-full bg-[#6D4AFF]"
                     transition={{ type: "spring", stiffness: 450, damping: 35 }}
                   />
                 )}

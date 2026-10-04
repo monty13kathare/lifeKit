@@ -5,13 +5,8 @@ import {
   bookmarksStore,
   decisionsStore,
   goalsStore,
-  DEFAULT_FOCUS_SETTINGS,
-  focusSessionsStore,
-  focusSettingsStore,
-  focusTimerStore,
-  DEFAULT_SETTINGS,
   eventsStore,
-  importantInfoStore,
+  DEFAULT_SETTINGS,
   notesStore,
   remindersStore,
   routinesStore,
@@ -64,10 +59,7 @@ export function useBookmarks() {
   return { bookmarks, ...pickMutations(bookmarksStore) }
 }
 
-export function useImportantInformation() {
-  const items = useStore(importantInfoStore)
-  return { items, ...pickMutations(importantInfoStore) }
-}
+
 
 export function useWellness() {
   const days = useStore(wellnessDaysStore)
@@ -113,15 +105,7 @@ function pickMutations<S extends { add: unknown; update: unknown; remove: unknow
   return { add: store.add, update: store.update, remove: store.remove, upsert: store.upsert, set: store.set } as Pick<S, "add" | "update" | "remove" | "upsert" | "set">
 }
 
-export function useFocus() {
-  const timer = useStore(focusTimerStore)
-  const sessions = useStore(focusSessionsStore)
-  const storedSettings = useStore(focusSettingsStore)
-  const settings = useMemo(() => ({ ...DEFAULT_FOCUS_SETTINGS, ...storedSettings }), [storedSettings])
-  const updateSettings = (patch: Partial<typeof settings>) =>
-    focusSettingsStore.set((prev) => ({ ...DEFAULT_FOCUS_SETTINGS, ...prev, ...patch }))
-  return { timer, sessions, settings, updateSettings, removeSession: focusSessionsStore.remove, upsertSession: focusSessionsStore.upsert }
-}
+
 
 export function useLearn() {
   const stored = useStore(learnStore)

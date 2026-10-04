@@ -7,10 +7,9 @@ import { differenceInCalendarDays, parseISO } from "date-fns"
 import { todayString } from "@/lib/dates"
 import { createValueStore } from "@/lib/storage/core"
 
-export type LearnTrack = "prompting" | "english" | "logic"
+export type LearnTrack = "english" | "logic"
 
 export const TRACKS: Record<LearnTrack, { name: string; href: string }> = {
-  prompting: { name: "AI Prompting", href: "/learn/prompting" },
   english: { name: "English", href: "/learn/english" },
   logic: { name: "Logic & Reasoning", href: "/learn/logic" },
 }
@@ -47,7 +46,7 @@ export interface LearnState {
 }
 
 export const DEFAULT_LEARN_STATE: LearnState = {
-  xp: { prompting: 0, english: 0, logic: 0 },
+  xp: { english: 0, logic: 0 },
   completedLessons: [],
   streak: { current: 0, best: 0 },
   dailyGoalXp: 50,

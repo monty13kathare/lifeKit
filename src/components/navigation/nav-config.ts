@@ -1,8 +1,11 @@
 import {
-  Ellipsis,
-  GraduationCap,
+  Folder,
   House,
   LayoutGrid,
+  Layers,
+  Plus,
+  Ellipsis,
+  GraduationCap,
   ListTodo,
   Scan,
   Settings,
@@ -34,10 +37,10 @@ export const DESKTOP_NAV: NavItem[] = [NAV.home, NAV.tools, NAV.life, NAV.learn,
 /** Mobile bottom bar: Home | Tools | [Tasks FAB] | My Life | More */
 export const MOBILE_NAV: NavItem[] = [
   NAV.home,
+  { href: "/files", label: "Files", icon: Folder },
+  { href: "/add", label: "Add", icon: Plus, isFab: true },
   NAV.tools,
-  { ...NAV.tasks, isFab: true },
-  NAV.life,
-  NAV.more,
+  { href: "/library", label: "Library", icon: Layers },
 ]
 
 /** Which top-level nav item a pathname belongs to. */

@@ -26,7 +26,6 @@ import { useTasks } from "@/hooks/use-lifekit-data"
 import { useAiStatus } from "@/hooks/use-ai-status"
 import { useHydrated } from "@/hooks/use-store"
 import { toDateString } from "@/lib/dates"
-import { startFocus } from "@/lib/focus"
 import { createId } from "@/lib/storage/core"
 import { cn } from "@/lib/utils"
 import type { Subtask, Task, TaskPriority } from "@/types"
@@ -235,11 +234,7 @@ export function TodoApp() {
     toast.success("Task duplicated", { description: task.title, action: { label: "Undo", onClick: () => remove(copy.id) } })
   }
 
-  const focusTask = (task: Task) => {
-    startFocus({ taskId: task.id })
-    toast.success("Focus started", { description: task.title })
-    router.push("/tools/focus")
-  }
+
 
   const breakDown = (task: Task) => {
     setBreakdownTask(task)
@@ -298,7 +293,7 @@ export function TodoApp() {
     onEdit: openEdit,
     onDelete: deleteTask,
     onSubtasksChange: changeSubtasks,
-    onFocus: focusTask,
+
     onDuplicate: duplicateTask,
     onBreakDown: aiConfigured ? breakDown : undefined,
   }
@@ -558,7 +553,7 @@ export function TodoApp() {
 
 type CardHandlers = Pick<
   React.ComponentProps<typeof TaskCard>,
-  "onToggle" | "onEdit" | "onDelete" | "onSubtasksChange" | "onFocus" | "onDuplicate" | "onBreakDown"
+  "onToggle" | "onEdit" | "onDelete" | "onSubtasksChange" | "onDuplicate" | "onBreakDown"
 >
 
 function TodayProgress({ done, total }: { done: number; total: number }) {

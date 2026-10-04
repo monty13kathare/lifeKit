@@ -33,7 +33,7 @@ export class AiError extends Error {
 
 interface GenerateOptions {
   system: string
-  prompt: string
+  prompt: string | any[]
   /** JSON schema for structured output; the result is then JSON text. */
   jsonSchema?: Record<string, unknown>
   temperature?: number

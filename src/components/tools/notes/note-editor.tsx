@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { format, parseISO } from "date-fns"
-import { ChevronLeft, Copy, Download, ListChecks, MoreVertical, Palette, Pin, PinOff, Trash2 } from "lucide-react"
+import { ChevronLeft, Copy, Download, FileText, ListChecks, MoreVertical, Palette, Pin, PinOff, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { AiTextActions } from "@/components/common/ai-text-actions"
 import { CopyButton } from "@/components/common/copy-button"
@@ -21,6 +21,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { downloadText } from "@/lib/files"
 import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation"
 import type { EventColor, Note } from "@/types"
 import { ExtractTasks } from "./extract-tasks"
 import { NoteChecklist } from "./note-checklist"
@@ -60,6 +61,7 @@ export function NoteEditor({ note, onSave, onUpdateMeta, onDelete, onDuplicate, 
   const [title, setTitle] = useState(note.title)
   const [content, setContent] = useState(note.content)
   const [status, setStatus] = useState<"saved" | "saving">("saved")
+  const router = useRouter()
   const timer = useRef<number | undefined>(undefined)
   const pending = useRef<Pick<Note, "title" | "content"> | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -191,6 +193,20 @@ export function NoteEditor({ note, onSave, onUpdateMeta, onDelete, onDuplicate, 
                 }}
               >
                 <Download aria-hidden /> Download as TXT
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={!text.trim()}
+                onClick={() => {
+                  flush()
+                  try {
+                    sessionStorage.setItem("lifekit:text-to-pdf-handoff", title + "\n\n" + content)
+                    router.push("/tools/text-to-pdf")
+                  } catch {
+                    toast.error("Failed to export. Note might be too large.")
+                  }
+                }}
+              >
+                <FileText aria-hidden /> Export to PDF
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onClick={() => onDelete(note)}>

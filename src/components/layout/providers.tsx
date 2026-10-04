@@ -6,7 +6,6 @@ import { MotionConfig } from "framer-motion"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ReminderScheduler } from "@/components/reminders/reminder-scheduler"
-import { FocusTicker } from "@/components/focus/focus-ticker"
 import { seedDemoDataIfNeeded } from "@/lib/storage/demo"
 import { InstallProvider } from "./install-context"
 
@@ -29,7 +28,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <InstallProvider>
             <Bootstrap />
             <ReminderScheduler />
-            <FocusTicker />
             {children}
             <Toaster position="top-center" richColors closeButton />
           </InstallProvider>

@@ -143,52 +143,6 @@ export const ASSIST_OUTPUT = {
     seeDoctor: z.array(z.string().max(300)).max(4),
   }),
 
-  /* ------------------------------------------------ Image Enhancer AI */
-  "image-enhancer-advice": z.object({
-    diagnosis: z.string().max(300),
-    recommendedPreset: z.enum(["ultra-hd", "old-photo", "deblur", "portrait", "custom"]),
-    scale: z.enum(["1", "2", "4"]),
-    sharpness: z.number().int().min(0).max(100),
-    denoise: z.number().int().min(0).max(100),
-    clarity: z.number().int().min(0).max(100),
-    vibrance: z.number().int().min(0).max(100),
-    contrast: z.number().int().min(-50).max(50),
-    brightness: z.number().int().min(-50).max(50),
-    autoWhiteBalance: z.boolean(),
-    faceEnhance: z.boolean(),
-    tip: z.string().max(250),
-  }),
-
-  /* ------------------------------------------------ AI Task Notes */
-  "task-notes": z.object({
-    title: z.string().min(1).max(200),
-    summary: z.string().max(500),
-    categories: z
-      .array(
-        z.object({
-          name: z.string().max(100),
-          emoji: z.string().max(10).optional(),
-          items: z
-            .array(
-              z.object({
-                task: z.string().min(1).max(300),
-                details: z.string().max(400).optional(),
-                priority: z.enum(["high", "medium", "low"]).optional(),
-                timeEstimate: z.string().max(50).optional(),
-                subtasks: z.array(z.string().max(200)).max(8).optional(),
-                completed: z.boolean().default(false),
-              })
-            )
-            .min(1)
-            .max(25),
-        })
-      )
-      .min(1)
-      .max(10),
-    whatsappFormatted: z.string().min(1).max(12000),
-    markdownFormatted: z.string().max(12000).optional(),
-    tips: z.array(z.string().max(300)).max(5).optional(),
-  }),
 
   /* ------------------------------------------------------------ Learn */
   /** Input JSON: { scenario, goal?, prompt } */

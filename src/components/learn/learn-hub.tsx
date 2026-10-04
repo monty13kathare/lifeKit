@@ -17,13 +17,11 @@ import { currentStreak, levelInfo, setDailyGoal, xpToday, type LearnTrack } from
 import { cn } from "@/lib/utils"
 
 const TRACK_OF: Record<string, LearnTrack> = {
-  "learn-prompting": "prompting",
   "learn-english": "english",
   "learn-logic": "logic",
 }
 
 const TRACK_BLURB: Record<LearnTrack, string[]> = {
-  prompting: ["Lessons on clear, effective prompts", "Prompt Lab graded by Gemini", "Template library"],
   english: ["Vocabulary flashcards (spaced repetition)", "Grammar lessons & quizzes", "AI writing coach & speaking practice"],
   logic: ["Daily puzzle & puzzle bank", "60-second mental maths", "Patterns & thinking skills"],
 }
@@ -33,7 +31,7 @@ export function LearnHub() {
   const state = useLearn()
   const ai = useAiStatus()
 
-  const totalXp = state.xp.prompting + state.xp.english + state.xp.logic
+  const totalXp = state.xp.english + state.xp.logic
   const overall = levelInfo(totalXp)
   const streak = currentStreak(state)
   const today = xpToday(state)
@@ -56,7 +54,7 @@ export function LearnHub() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Learn Skills</h1>
           <p className="mt-1 text-muted-foreground">
-            Build AI prompting, English and logic skills a few minutes a day. Progress stays on this device.
+            Build English and logic skills a few minutes a day. Progress stays on this device.
           </p>
         </div>
       </header>

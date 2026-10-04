@@ -1,10 +1,15 @@
+"use client"
+
 import Link from "next/link"
 import { Logo } from "@/components/common/logo"
 import { ProfileMenu } from "./profile-menu"
 import { ThemeToggle } from "./theme-toggle"
-import { FocusPill } from "@/components/focus/focus-pill"
+import { usePathname } from "next/navigation"
 
 export function Header() {
+  const pathname = usePathname()
+  if (pathname === "/") return null
+
   return (
     <header className="sticky top-0 z-30 border-b bg-background/85 pt-safe backdrop-blur-lg supports-backdrop-filter:bg-background/70">
       <div className="flex h-14 items-center gap-2 px-4 sm:px-6 lg:h-16 lg:px-8">
@@ -12,7 +17,6 @@ export function Header() {
           <Logo />
         </Link>
         <div className="flex-1" />
-        <FocusPill />
         <ThemeToggle />
         <ProfileMenu />
       </div>

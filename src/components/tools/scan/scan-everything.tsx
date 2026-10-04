@@ -19,8 +19,6 @@ import { scanHistory, setOcrHandoff } from "@/lib/qr/session"
 const QUICK_LINKS: Array<{ href: string; label: string; description: string; icon: LucideIcon }> = [
   { href: "/tools/pdf-scanner", label: "Document scan", description: "Paper to PDF", icon: FileScan },
   { href: "/tools/ocr", label: "OCR", description: "Text from images", icon: ScanText },
-  { href: "/tools/qr-scanner", label: "QR Scanner", description: "With link checks", icon: ScanLine },
-  { href: "/tools/barcode-scanner", label: "Barcode Scanner", description: "Product codes", icon: ScanBarcode },
   { href: "/tools/qr-generator", label: "QR Generator", description: "Make your own", icon: QrCode },
 ]
 

@@ -1,10 +1,9 @@
 import { addDays, setHours, setMinutes, startOfDay } from "date-fns"
 import { toDateString } from "@/lib/dates"
-import type { Bookmark, CalendarEvent, ImportantInfo, RoutineItem, Task } from "@/types"
+import type { Bookmark, CalendarEvent, RoutineItem, Task } from "@/types"
 import { allStores, createId } from "./core"
 import { bookmarksStore } from "./bookmarks"
 import { eventsStore } from "./calendar"
-import { importantInfoStore } from "./important-information"
 import { routinesStore } from "./routines"
 import { settingsStore, DEFAULT_SETTINGS } from "./settings"
 import { tasksStore } from "./tasks"
@@ -80,12 +79,7 @@ export function seedDemoDataIfNeeded() {
     },
   ]
 
-  const info: ImportantInfo[] = [
-    {
-      id: createId(), title: "Society Office", category: "home", phone: "+91 98765 43210",
-      notes: "Open 9 AM – 6 PM, closed Sundays.", sensitive: false, createdAt: created, demo: true,
-    },
-  ]
+
 
   tasksStore.set((prev) => [...prev, ...tasks])
   eventsStore.set((prev) => [...prev, ...events])
@@ -94,7 +88,7 @@ export function seedDemoDataIfNeeded() {
     ...routine.map((r, i) => ({ ...r, id: createId(), order: i, completedDates: [], demo: true })),
   ])
   bookmarksStore.set((prev) => [...prev, ...bookmarks])
-  importantInfoStore.set((prev) => [...prev, ...info])
+
   settingsStore.set((prev) => ({ ...DEFAULT_SETTINGS, ...prev, seeded: true }))
 }
 

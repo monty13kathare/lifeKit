@@ -89,36 +89,30 @@ const A = {
 
 export const TOOLS: Tool[] = [
   // Documents
+  { id: "text-to-pdf", name: "Text to PDF", description: "Convert rich text and notes into a PDF.", href: "/tools/text-to-pdf", icon: FileText, category: "documents", section: "tools", accent: A.rose },
   { id: "image-to-pdf", name: "Image to PDF", description: "Convert multiple images into a PDF.", href: "/tools/image-to-pdf", icon: FileImage, category: "documents", section: "tools", accent: A.rose },
   { id: "pdf-editor", name: "PDF Editor", description: "Reorder, annotate, sign and watermark PDFs.", href: "/tools/pdf-editor", icon: FilePen, category: "documents", section: "tools", accent: A.rose },
   { id: "pdf-scanner", name: "PDF Scanner", description: "Scan paper documents into a clean PDF.", href: "/tools/pdf-scanner", icon: FileScan, category: "documents", section: "tools", accent: A.rose },
-  { id: "ocr", name: "OCR", description: "Extract text from images.", href: "/tools/ocr", icon: ScanText, category: "documents", section: "tools", accent: A.violet },
-
   // Images
-  { id: "image-enhancer", name: "AI Image Enhancer", description: "Restore, deblur and upscale old or bad-quality photos to Ultra HD.", href: "/tools/image-enhancer", icon: Sparkles, category: "images", section: "tools", accent: A.violet },
+  { id: "ocr", name: "OCR", description: "Extract text from images.", href: "/tools/ocr", icon: ScanText, category: "images", section: "tools", accent: A.violet },
   { id: "image-resizer", name: "Resize Image", description: "Change dimensions with handy presets.", href: "/tools/image-resizer", icon: Scaling, category: "images", section: "tools", accent: A.sky },
   { id: "image-compressor", name: "Compress Image", description: "Reduce image size quickly.", href: "/tools/image-compressor", icon: Minimize2, category: "images", section: "tools", accent: A.sky },
   { id: "image-converter", name: "Convert Image", description: "Switch between JPG, PNG and WebP.", href: "/tools/image-converter", icon: Repeat2, category: "images", section: "tools", accent: A.sky },
 
   // Scan
   { id: "scan", name: "Scan Everything", description: "One camera for QR, barcodes and text.", href: "/scan", icon: Scan, category: "scan", section: "tools", accent: A.indigo },
-  { id: "qr-scanner", name: "QR Scanner", description: "Scan QR codes with your camera.", href: "/tools/qr-scanner", icon: ScanLine, category: "scan", section: "tools", accent: A.indigo },
-  { id: "barcode-scanner", name: "Barcode Scanner", description: "Read product and shipping barcodes.", href: "/tools/barcode-scanner", icon: ScanBarcode, category: "scan", section: "tools", accent: A.indigo },
   { id: "qr-generator", name: "QR Generator", description: "Create QR codes for links and content.", href: "/tools/qr-generator", icon: QrCode, category: "scan", section: "tools", accent: A.indigo },
 
   // AI Productivity
-  { id: "task-notes", name: "AI Task Notes", description: "Convert rough comma-separated thoughts into detailed, point-by-point checklists for WhatsApp.", href: "/tools/task-notes", icon: ListChecks, category: "ai", section: "tools", accent: A.emerald },
   { id: "ai-writer", name: "AI Writer", description: "Draft, rewrite and translate emails and messages.", href: "/tools/ai-writer", icon: PenLine, category: "ai", section: "tools", accent: A.violet },
   { id: "summarizer", name: "Summarizer", description: "TL;DR, key points and action items from any text.", href: "/tools/summarizer", icon: FileText, category: "ai", section: "tools", accent: A.violet },
   { id: "goal-planner", name: "Goal Planner", description: "Turn a goal into milestones and tasks.", href: "/tools/goal-planner", icon: Target, category: "ai", section: "tools", accent: A.violet },
-  { id: "decision-helper", name: "Decision Helper", description: "Weigh options with a scored pros & cons matrix.", href: "/tools/decision-helper", icon: Scale, category: "ai", section: "tools", accent: A.violet },
 
   // Finance
   { id: "smart-calculator", name: "Smart Calculator", description: "Type maths naturally, like “20% of 15000”.", href: "/tools/calculators/smart", icon: Calculator, category: "finance", section: "tools", accent: A.emerald },
   { id: "emi-calculator", name: "EMI Calculator", description: "Calculate monthly loan payments.", href: "/tools/calculators/emi", icon: Landmark, category: "finance", section: "tools", accent: A.emerald },
   { id: "gst-calculator", name: "GST Calculator", description: "Add or remove GST with CGST/SGST split.", href: "/tools/calculators/gst", icon: Receipt, category: "finance", section: "tools", accent: A.emerald },
   { id: "percentage-calculator", name: "Percentage Calculator", description: "Increases, discounts, marks and more.", href: "/tools/calculators/percentage", icon: Percent, category: "finance", section: "tools", accent: A.emerald },
-  { id: "unit-converter", name: "Unit Converter", description: "Length, weight, temperature and more.", href: "/tools/calculators/units", icon: Ruler, category: "finance", section: "tools", accent: A.emerald },
 
   // Security
   { id: "password-generator", name: "Password Generator", description: "Strong, random passwords in one tap.", href: "/tools/password-generator", icon: KeyRound, category: "security", section: "tools", accent: A.amber },
@@ -129,16 +123,14 @@ export const TOOLS: Tool[] = [
   { id: "routine-planner", name: "Daily Routine", description: "Build a daily timeline that sticks.", href: "/tools/routine-planner", icon: Sunrise, category: "productivity", section: "life", accent: A.orange },
   { id: "calendar", name: "Calendar", description: "Month, week, day and agenda views.", href: "/tools/calendar", icon: CalendarDays, category: "productivity", section: "life", accent: A.sky },
   { id: "reminders", name: "Reminders", description: "Never forget the important stuff.", href: "/tools/reminders", icon: Bell, category: "productivity", section: "life", accent: A.amber },
-  { id: "focus", name: "Focus Timer", description: "Pomodoro sessions linked to your tasks.", href: "/tools/focus", icon: Timer, category: "productivity", section: "life", accent: A.rose },
   { id: "notes", name: "Notes", description: "Quick notes, including text from OCR.", href: "/tools/notes", icon: NotebookPen, category: "productivity", section: "life", accent: A.violet },
 
   // My Life — personal
   { id: "wellness", name: "Wellness", description: "Water, sleep, activity and habits.", href: "/tools/wellness", icon: HeartPulse, category: "personal", section: "life", accent: A.rose },
   { id: "bookmarks", name: "Bookmarks", description: "Save useful links for later.", href: "/tools/bookmarks", icon: Bookmark, category: "personal", section: "life", accent: A.teal },
-  { id: "important-information", name: "Important Info", description: "Emergency contacts and key details.", href: "/tools/important-information", icon: Contact, category: "personal", section: "life", accent: A.emerald },
+
 
   // Learn Skills
-  { id: "learn-prompting", name: "AI Prompting", description: "Write prompts that get great results.", href: "/learn/prompting", icon: Brain, category: "learn", section: "learn", accent: A.violet },
   { id: "learn-english", name: "English", description: "Vocabulary, grammar and writing practice.", href: "/learn/english", icon: BookA, category: "learn", section: "learn", accent: A.sky },
   { id: "learn-logic", name: "Logic & Reasoning", description: "Puzzles, patterns and mental maths.", href: "/learn/logic", icon: Puzzle, category: "learn", section: "learn", accent: A.amber },
 ]

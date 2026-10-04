@@ -3,6 +3,13 @@ export type DateString = string
 export type TimeString = string
 export type ISODateTime = string
 
+export interface EncryptedPayload {
+  salt: string
+  iv: string
+  cipher: string
+  iterations?: number
+}
+
 export type Recurrence = "none" | "daily" | "weekly" | "monthly" | "yearly"
 
 /* ------------------------------------------------------------------ Tasks */
@@ -28,8 +35,6 @@ export interface Task {
   completedAt?: ISODateTime
   subtasks: Subtask[]
   createdAt: ISODateTime
-  /** Total minutes spent on this task in completed Focus sessions. */
-  focusMinutes?: number
   demo?: boolean
 }
 
@@ -115,53 +120,6 @@ export interface Note {
   demo?: boolean
 }
 
-/* ------------------------------------------------------------------ Focus */
-
-export type FocusPhase = "focus" | "short-break" | "long-break"
-
-export interface FocusSettings {
-  focusMinutes: number
-  shortBreakMinutes: number
-  longBreakMinutes: number
-  /** Focus sessions before a long break. */
-  sessionsBeforeLongBreak: number
-  autoStartBreaks: boolean
-  autoStartFocus: boolean
-  /** Daily goal in focus minutes. */
-  dailyGoalMinutes: number
-  sound: boolean
-}
-
-/** Live timer state; persisted so the timer survives navigation and reloads. */
-export interface FocusTimerState {
-  phase: FocusPhase
-  status: "idle" | "running" | "paused"
-  /** When running: epoch ms the phase ends. */
-  endsAt?: number
-  /** When paused: ms left. */
-  remainingMs?: number
-  /** Planned length of the current phase in ms. */
-  durationMs: number
-  /** Focus sessions completed in the current cycle (resets after a long break). */
-  cycleCount: number
-  taskId?: string
-  label?: string
-}
-
-export interface FocusSession {
-  id: string
-  phase: FocusPhase
-  taskId?: string
-  label?: string
-  startedAt: ISODateTime
-  endedAt: ISODateTime
-  /** Actual minutes, rounded. */
-  minutes: number
-  /** False when stopped early. */
-  completed: boolean
-  demo?: boolean
-}
-
 /* --------------------------------------------------------------- Wellness */
 
 export interface WellnessDay {
@@ -207,46 +165,6 @@ export interface Bookmark {
   demo?: boolean
 }
 
-/* ------------------------------------------------- Important information */
-
-export type InfoCategory =
-  | "emergency"
-  | "family"
-  | "work"
-  | "school"
-  | "vehicle"
-  | "home"
-  | "travel"
-  | "other"
-
-export interface EncryptedPayload {
-  /** base64 */
-  salt: string
-  /** base64 */
-  iv: string
-  /** base64 AES-GCM ciphertext of a JSON object of the secret fields */
-  cipher: string
-  /** PBKDF2 iteration count used to derive the key (stored so it can be raised later). */
-  iterations?: number
-}
-
-export interface ImportantInfo {
-  id: string
-  title: string
-  category: InfoCategory
-  phone?: string
-  email?: string
-  details?: string
-  notes?: string
-  /**
-   * When true, `details`/`notes` are not stored in plaintext: they live inside
-   * `encrypted`, locked with a passphrase the user chooses (Web Crypto).
-   */
-  sensitive: boolean
-  encrypted?: EncryptedPayload
-  createdAt: ISODateTime
-  demo?: boolean
-}
 
 /* --------------------------------------------------------------- Settings */
 
