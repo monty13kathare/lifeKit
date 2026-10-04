@@ -40,7 +40,7 @@ export function AiLanguageToggle({ className, showLabel = true }: { className?: 
             aria-checked={current === o.value}
             onClick={() => update({ aiLanguage: o.value })}
             className={cn(
-              "min-h-8 rounded-md px-3 font-medium transition-colors",
+              "min-h-10 rounded-md px-3 font-medium transition-colors",
               current === o.value ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
             )}
           >

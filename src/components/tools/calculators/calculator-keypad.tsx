@@ -90,7 +90,7 @@ export function CalculatorKeypad({ onKey, scientific, angle, onAngleChange, onSc
           aria-pressed={scientific}
           onClick={() => onScientificChange(!scientific)}
           className={cn(
-            "h-9 rounded-lg px-3 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+            "h-10 rounded-lg px-3 text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
             scientific ? "bg-primary/10 text-primary" : "bg-muted text-foreground/70 hover:text-foreground"
           )}
         >
@@ -104,7 +104,7 @@ export function CalculatorKeypad({ onKey, scientific, angle, onAngleChange, onSc
               aria-pressed={angle === a}
               onClick={() => onAngleChange(a)}
               className={cn(
-                "h-8 rounded-md px-3 text-xs font-semibold uppercase outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                "h-10 rounded-md px-3 text-xs font-semibold uppercase outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                 angle === a ? "bg-background text-foreground shadow-sm dark:bg-input/40" : "text-foreground/60"
               )}
             >

@@ -1,10 +1,12 @@
 "use client"
 
+import { useEffect } from "react"
 import { Bookmark, BookmarkCheck, Check, Home, RotateCcw, Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { starsFor } from "@/lib/learn/fun"
 import { cn } from "@/lib/utils"
 import type { FunMode } from "@/types"
+import { Confetti, haptic, useCountUp } from "./celebrate"
 import { tr, type ActiveQuiz } from "./fun-utils"
 import type { GameSummary } from "./quiz-player"
 
@@ -13,6 +15,13 @@ const VERDICTS = [
   { en: "Nice effort — you're getting there! 💪", hi: "अच्छी कोशिश — आप आगे बढ़ रहे हैं! 💪" },
   { en: "Great job! Your brain is warming up! 🔥", hi: "बहुत बढ़िया! दिमाग़ गरम हो रहा है! 🔥" },
   { en: "Superstar! Outstanding score! 🏆", hi: "सुपरस्टार! शानदार स्कोर! 🏆" },
+]
+
+const MEDALS = [
+  { emoji: "💪", stroke: "stroke-muted-foreground", glow: "bg-muted-foreground/30" },
+  { emoji: "🥉", stroke: "stroke-orange-500", glow: "bg-orange-500/40" },
+  { emoji: "🥈", stroke: "stroke-sky-500", glow: "bg-sky-500/40" },
+  { emoji: "🏆", stroke: "stroke-amber-400", glow: "bg-amber-400/45" },
 ]
 
 interface QuizResultsProps {
@@ -34,50 +43,87 @@ export function QuizResults({ quiz, mode, summary, levelUp, saved, aiEnabled, on
   const pct = Math.round((summary.correct / total) * 100)
   const stars = starsFor(pct)
 
+  const shownPct = useCountUp(pct, 1200, 350)
+  const shownXp = useCountUp(summary.xp, 1000, 900)
+  const medal = MEDALS[stars]
+  const ring = 2 * Math.PI * 52
+
+  // A happy buzz for good results, once.
+  useEffect(() => {
+    if (stars >= 2) haptic([40, 60, 40, 60, 80])
+  }, [stars])
+
   return (
     <div className="mx-auto max-w-2xl space-y-5">
-      <section className="relative overflow-hidden rounded-3xl border bg-card p-6 text-center shadow-soft">
-        {stars >= 2 && (
-          <div className="pointer-events-none absolute inset-0 flex justify-around text-2xl" aria-hidden>
-            {["🎉", "✨", "🎊", "⭐", "🎉"].map((e, i) => (
-              <span key={i} className="animate-in fade-in slide-in-from-top-10 fill-mode-both duration-700" style={{ animationDelay: `${i * 120}ms` }}>
-                {e}
-              </span>
-            ))}
-          </div>
-        )}
+      {stars >= 2 && <Confetti pieces={stars === 3 ? 48 : 30} />}
+      <section className="relative overflow-hidden rounded-3xl border bg-card px-5 pt-6 pb-5 text-center shadow-soft">
+        {/* Soft glow behind the medal */}
+        <div className={cn("pointer-events-none absolute top-6 left-1/2 size-48 -translate-x-1/2 rounded-full blur-3xl animate-lk-glow", medal.glow)} aria-hidden />
+
         <div className="relative">
-          <p className="text-sm font-medium text-muted-foreground">
+          <p className="mx-auto max-w-full truncate rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground sm:inline-block">
             {summary.gameOver ? tr(lang, { en: "Game over", hi: "खेल समाप्त" }) : tr(lang, { en: "Quiz complete", hi: "क्विज़ पूरा" })} · {quiz.title}
           </p>
-          <div className="mt-3 flex justify-center gap-1 text-4xl" aria-label={`${stars} of 3 stars`}>
+
+          {/* Score ring with the medal inside */}
+          <div className="relative mx-auto mt-5 size-36">
+            <svg viewBox="0 0 120 120" className="size-full -rotate-90" aria-hidden>
+              <circle cx="60" cy="60" r="52" fill="none" strokeWidth="10" className="stroke-muted" />
+              <circle
+                cx="60"
+                cy="60"
+                r="52"
+                fill="none"
+                strokeWidth="10"
+                strokeLinecap="round"
+                className={medal.stroke}
+                strokeDasharray={ring}
+                strokeDashoffset={ring * (1 - shownPct / 100)}
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-4xl leading-none animate-lk-drop" style={{ animationDelay: "150ms" }} aria-hidden>
+                {medal.emoji}
+              </span>
+              <span className="mt-1 text-2xl font-bold tracking-tight tabular-nums" aria-label={`${pct} percent`}>
+                {shownPct}%
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-4 flex justify-center gap-2 text-3xl" role="img" aria-label={`${stars} of 3 stars`}>
             {[0, 1, 2].map((i) => (
-              <span
-                key={i}
-                className={cn("animate-in zoom-in-50 fill-mode-both duration-500", i < stars ? "" : "opacity-20 grayscale")}
-                style={{ animationDelay: `${200 + i * 200}ms` }}
-              >
+              <span key={i} className={cn("animate-lk-pop", i < stars ? "drop-shadow-[0_2px_8px_rgba(250,204,21,0.55)]" : "opacity-20 grayscale")} style={{ animationDelay: `${900 + i * 220}ms` }}>
                 ⭐
               </span>
             ))}
           </div>
-          <p className="mt-3 text-5xl font-bold tracking-tight tabular-nums">{pct}%</p>
-          <p className="mt-1 text-muted-foreground">
+
+          <p className="mt-3 text-lg font-semibold text-balance animate-lk-rise" style={{ animationDelay: "1.4s" }}>
+            {tr(lang, VERDICTS[stars])}
+          </p>
+          <p className="mt-0.5 text-sm text-muted-foreground animate-lk-rise" style={{ animationDelay: "1.5s" }}>
             {mode === "study"
               ? tr(lang, { en: `You knew ${summary.correct} of ${total}`, hi: `${total} में से ${summary.correct} आपको पता थे` })
               : tr(lang, { en: `${summary.correct} of ${total} correct`, hi: `${total} में से ${summary.correct} सही` })}
           </p>
-          <p className="mt-3 font-medium">{tr(lang, VERDICTS[stars])}</p>
 
           <div className="mt-5 grid grid-cols-3 gap-2 text-sm">
-            <Stat value={`+${summary.xp}`} label="XP" />
-            <Stat value={`🔥 ${summary.bestCombo}`} label={tr(lang, { en: "Best combo", hi: "सर्वश्रेष्ठ कॉम्बो" })} />
-            <Stat value={`${summary.answered}/${total}`} label={tr(lang, { en: "Answered", hi: "उत्तर दिए" })} />
+            <Stat value={`+${shownXp}`} label="XP ⭐" delay={1.6} highlight />
+            {mode === "study" ? (
+              <Stat value={`✅ ${summary.correct}`} label={tr(lang, { en: "Knew it", hi: "पता था" })} delay={1.7} />
+            ) : (
+              <Stat value={`🔥 ${summary.bestCombo}`} label={tr(lang, { en: "Best combo", hi: "सर्वश्रेष्ठ कॉम्बो" })} delay={1.7} />
+            )}
+            <Stat value={`${summary.answered}/${total}`} label={tr(lang, { en: "Answered", hi: "उत्तर दिए" })} delay={1.8} />
           </div>
           {levelUp && (
-            <p className="mt-4 animate-in zoom-in-95 rounded-xl bg-primary/10 px-3 py-2 font-semibold text-primary">
-              🎖️ {tr(lang, { en: `Level up! You reached level ${levelUp}`, hi: `लेवल अप! आप लेवल ${levelUp} पर पहुँचे` })}
-            </p>
+            <div className="mt-4 flex items-center justify-center gap-2 rounded-2xl bg-linear-to-r from-primary/15 via-primary/25 to-primary/15 px-3 py-2.5 font-semibold text-primary animate-lk-pop" style={{ animationDelay: "2s" }}>
+              <span className="text-xl" aria-hidden>
+                🎖️
+              </span>
+              {tr(lang, { en: `Level up! You reached level ${levelUp}`, hi: `लेवल अप! आप लेवल ${levelUp} पर पहुँचे` })}
+            </div>
           )}
         </div>
       </section>
@@ -128,7 +174,7 @@ export function QuizResults({ quiz, mode, summary, levelUp, saved, aiEnabled, on
                     >
                       {right ? <Check className="size-3.5" aria-hidden /> : <X className="size-3.5" aria-hidden />}
                     </span>
-                    <span className="min-w-0 flex-1 text-sm font-medium break-words">{q.question}</span>
+                    <span className="min-w-0 flex-1 text-sm font-medium wrap-break-word">{q.question}</span>
                   </summary>
                   <div className="mt-3 space-y-1.5 pl-9 text-sm">
                     {q.story?.trim() && <p className="line-clamp-3 text-muted-foreground">{q.story}</p>}
@@ -159,9 +205,9 @@ export function QuizResults({ quiz, mode, summary, levelUp, saved, aiEnabled, on
   )
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({ value, label, delay = 0, highlight }: { value: string; label: string; delay?: number; highlight?: boolean }) {
   return (
-    <div className="rounded-xl bg-surface-muted px-2 py-2.5">
+    <div className={cn("rounded-xl px-2 py-2.5 animate-lk-rise", highlight ? "bg-primary/12 text-primary" : "bg-surface-muted")} style={{ animationDelay: `${delay}s` }}>
       <p className="text-lg font-semibold tabular-nums">{value}</p>
       <p className="text-xs text-muted-foreground">{label}</p>
     </div>

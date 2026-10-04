@@ -1,5 +1,5 @@
 import "server-only"
-import { ApiError, GoogleGenAI } from "@google/genai"
+import { ApiError, GoogleGenAI, type PartUnion } from "@google/genai"
 
 /**
  * Server-only access to Google Gemini. The API key is read from `GEMINI_API_KEY`
@@ -33,7 +33,8 @@ export class AiError extends Error {
 
 interface GenerateOptions {
   system: string
-  prompt: string | any[]
+  /** Plain text, or parts (e.g. an inline image plus text). */
+  prompt: string | PartUnion[]
   /** JSON schema for structured output; the result is then JSON text. */
   jsonSchema?: Record<string, unknown>
   temperature?: number

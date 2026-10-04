@@ -207,7 +207,7 @@ export function ImageConverterTool() {
           <h2 id="cnv-heading" className="text-base font-semibold">
             {items.length} image{items.length === 1 ? "" : "s"}
           </h2>
-          <Button variant="ghost" size="sm" onClick={clearAll} disabled={busy}>
+          <Button variant="ghost" onClick={clearAll} disabled={busy}>
             <Trash2 aria-hidden /> Clear all
           </Button>
         </div>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useEffectEvent, useRef, useState } from "react"
 import { format, formatDistanceToNowStrict } from "date-fns"
 import {
   Archive,
@@ -95,19 +95,20 @@ export function OpenShare() {
     }
   }
 
-  // Check URL query parameters and hash on mount
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const params = new URLSearchParams(window.location.search)
-    const pkgUrl = params.get("pkg")
+  // Opening a shared link (?pkg=…#key=…) starts the download on mount. It's an effect
+  // event so it always sees the latest state setters without re-running the effect.
+  const openLinkFromUrl = useEffectEvent(() => {
+    const pkgUrl = new URLSearchParams(window.location.search).get("pkg")
     if (!pkgUrl) return
-
-    // Extract decryption key from URL hash (#key=xyz)
-    const hash = window.location.hash
-    const match = hash.match(/key=([^&]+)/)
-    const keyFromHash = match ? decodeURIComponent(match[1]) : ""
-
-    loadRemotePackage(pkgUrl, keyFromHash)
+    // The decryption key lives in the hash, which is never sent to any server.
+    const match = window.location.hash.match(/key=([^&]+)/)
+    void loadRemotePackage(pkgUrl, match ? decodeURIComponent(match[1]) : "")
+  })
+  const linkHandled = useRef(false)
+  useEffect(() => {
+    if (linkHandled.current) return
+    linkHandled.current = true
+    openLinkFromUrl()
   }, [])
 
   const choose = async ([file]: File[]) => {
@@ -236,7 +237,7 @@ export function OpenShare() {
                   variant="outline"
                   onClick={downloadAllZip}
                   disabled={zipping}
-                  className="h-8 gap-1.5 text-xs"
+                  className="gap-1.5 text-xs"
                 >
                   {zipping ? <Loader2 className="size-3.5 animate-spin" /> : <Archive className="size-3.5" />}
                   Download all as ZIP

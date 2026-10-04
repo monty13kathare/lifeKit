@@ -92,6 +92,29 @@ export function proteinRange(p: HealthProfile): [number, number] | null {
   return [Math.round(lo * p.weightKg), Math.round(hi * p.weightKg)]
 }
 
+/** Daily macros (grams) for the calorie target: protein from the goal range, fat ~27% of calories, carbs the rest. */
+export function macros(p: HealthProfile): { kcal: number; protein: number; carbs: number; fat: number } | null {
+  const kcal = calorieTarget(p)
+  const protein = proteinRange(p)
+  if (!kcal || !protein) return null
+  const proteinG = Math.round((protein[0] + protein[1]) / 2)
+  const fat = Math.round((kcal * 0.27) / 9)
+  const carbs = Math.max(0, Math.round((kcal - proteinG * 4 - fat * 9) / 4))
+  return { kcal, protein: proteinG, carbs, fat }
+}
+
+/**
+ * Rough time to reach the target weight at a safe pace (lose ~0.5 kg/week,
+ * gain ~0.25 kg/week). Null when there's no lose/gain target.
+ */
+export function weeksToTarget(p: HealthProfile): { weeks: number; kgPerWeek: number; deltaKg: number } | null {
+  if (!p.weightKg || !p.targetWeightKg) return null
+  const delta = Math.round((p.targetWeightKg - p.weightKg) * 10) / 10
+  if (p.goal === "lose-weight" && delta < 0) return { weeks: Math.ceil(-delta / 0.5), kgPerWeek: 0.5, deltaKg: delta }
+  if (p.goal === "gain-weight" && delta > 0) return { weeks: Math.ceil(delta / 0.25), kgPerWeek: 0.25, deltaKg: delta }
+  return null
+}
+
 /** Water target in 250 ml glasses (~35 ml per kg, adjusted for activity), clamped 6–16. */
 export function waterGlasses(p: HealthProfile): number | null {
   if (!p.weightKg) return null

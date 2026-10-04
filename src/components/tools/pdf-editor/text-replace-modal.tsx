@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Bold, Check, Eraser, FilePenLine, Minus, Plus, Type, X } from "lucide-react"
+import { useState } from "react"
+import { Bold, Check, Eraser, FilePenLine, Minus, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -15,7 +15,6 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-import { FONT_SIZES, INK_COLORS } from "./types"
 
 export interface TextReplaceValues {
   text: string
@@ -25,6 +24,8 @@ export interface TextReplaceValues {
   textColor: string
   bgColor: string
 }
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i
 
 interface TextReplaceModalProps {
   open: boolean
@@ -50,27 +51,23 @@ export function TextReplaceModal({
   const [textColor, setTextColor] = useState(initialValues.textColor)
   const [bgColor, setBgColor] = useState(initialValues.bgColor)
 
-  // Sync state whenever modal opens or initial values change
-  useEffect(() => {
-    if (open) {
-      setText(initialValues.text)
-      setFontSize(initialValues.fontSize)
-      setFontFamily(initialValues.fontFamily)
-      setFontWeight(initialValues.fontWeight)
-      setTextColor(initialValues.textColor)
-      setBgColor(initialValues.bgColor)
-    }
-  }, [open, initialValues])
+  // State is seeded from `initialValues` on mount; the parent remounts this
+  // modal (via `key`) for each new target, so no syncing effect is needed.
+
+  // Typed hex values may be half-finished; fall back to the matched colours.
+  const safeTextColor = HEX_COLOR.test(textColor) ? textColor : initialValues.textColor
+  const safeBgColor = HEX_COLOR.test(bgColor) ? bgColor : initialValues.bgColor
+  const safeFontSize = Number.isFinite(fontSize) ? Math.min(300, Math.max(1, fontSize)) : initialValues.fontSize
 
   const handleApply = (e?: React.FormEvent) => {
     e?.preventDefault()
     onApply({
       text,
-      fontSize,
+      fontSize: safeFontSize,
       fontFamily,
       fontWeight,
-      textColor,
-      bgColor,
+      textColor: safeTextColor,
+      bgColor: safeBgColor,
     })
     onClose()
   }
@@ -81,11 +78,11 @@ export function TextReplaceModal({
     } else {
       onApply({
         text: "",
-        fontSize,
+        fontSize: safeFontSize,
         fontFamily,
         fontWeight,
-        textColor,
-        bgColor,
+        textColor: safeTextColor,
+        bgColor: safeBgColor,
       })
     }
     onClose()
@@ -129,7 +126,7 @@ export function TextReplaceModal({
                 {fontSize}pt
               </span>
               <span className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
-                <span className="inline-block size-2.5 rounded-full border" style={{ backgroundColor: textColor }} />
+                <span className="inline-block size-2.5 rounded-full border" style={{ backgroundColor: safeTextColor }} />
                 {textColor}
               </span>
             </div>
@@ -174,11 +171,11 @@ export function TextReplaceModal({
             </span>
             <div
               className="p-3 rounded-lg border min-h-[44px] flex items-center justify-start overflow-hidden"
-              style={{ backgroundColor: bgColor }}
+              style={{ backgroundColor: safeBgColor }}
             >
               <span
                 style={{
-                  color: textColor,
+                  color: safeTextColor,
                   fontSize: `${Math.min(28, Math.max(12, fontSize))}px`,
                   fontFamily: fontCss,
                   fontWeight: fontWeight === "bold" ? "bold" : "normal",
@@ -192,7 +189,7 @@ export function TextReplaceModal({
           </div>
 
           {/* Font & Style Controls */}
-          <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
             {/* Font Family */}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Font Family</Label>
@@ -201,7 +198,7 @@ export function TextReplaceModal({
                   type="button"
                   onClick={() => setFontFamily("sans")}
                   className={cn(
-                    "h-8 rounded-md border text-xs font-medium transition-colors",
+                    "h-10 rounded-md border text-xs font-medium transition-colors",
                     fontFamily === "sans"
                       ? "border-primary bg-primary/10 text-primary"
                       : "bg-surface hover:bg-muted"
@@ -213,7 +210,7 @@ export function TextReplaceModal({
                   type="button"
                   onClick={() => setFontFamily("serif")}
                   className={cn(
-                    "h-8 rounded-md border text-xs font-medium font-serif transition-colors",
+                    "h-10 rounded-md border text-xs font-medium font-serif transition-colors",
                     fontFamily === "serif"
                       ? "border-primary bg-primary/10 text-primary"
                       : "bg-surface hover:bg-muted"
@@ -225,7 +222,7 @@ export function TextReplaceModal({
                   type="button"
                   onClick={() => setFontFamily("mono")}
                   className={cn(
-                    "h-8 rounded-md border text-xs font-medium font-mono transition-colors",
+                    "h-10 rounded-md border text-xs font-medium font-mono transition-colors",
                     fontFamily === "mono"
                       ? "border-primary bg-primary/10 text-primary"
                       : "bg-surface hover:bg-muted"
@@ -245,20 +242,22 @@ export function TextReplaceModal({
                   aria-pressed={fontWeight === "bold"}
                   onClick={() => setFontWeight((w) => (w === "bold" ? "normal" : "bold"))}
                   className={cn(
-                    "size-8 shrink-0 rounded-md border flex items-center justify-center transition-colors",
+                    "size-10 shrink-0 rounded-md border flex items-center justify-center transition-colors",
                     fontWeight === "bold"
                       ? "border-primary bg-primary/10 text-primary"
                       : "bg-surface hover:bg-muted"
                   )}
                   title="Toggle Bold"
+                  aria-label="Bold"
                 >
                   <Bold className="size-4" />
                 </button>
                 <div className="flex flex-1 items-center gap-1">
                   <button
                     type="button"
-                    onClick={() => setFontSize((s) => Math.max(6, Math.round((s - 0.5) * 10) / 10))}
-                    className="size-8 shrink-0 rounded-md border flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setFontSize((s) => Math.max(6, Math.round(((Number.isFinite(s) ? s : initialValues.fontSize) - 0.5) * 10) / 10))}
+                    aria-label="Decrease font size"
+                    className="size-10 shrink-0 rounded-md border flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                     title="Decrease font size"
                   >
                     <Minus className="size-3" />
@@ -269,18 +268,20 @@ export function TextReplaceModal({
                       step="any"
                       min="1"
                       max="300"
-                      value={fontSize}
-                      onChange={(e) => setFontSize(Number(e.target.value) || 12)}
-                      className="h-8 text-xs font-mono pr-6 text-center"
+                      value={Number.isFinite(fontSize) ? fontSize : ""}
+                      aria-label="Font size in points"
+                      onChange={(e) => setFontSize(e.target.value === "" ? NaN : Number(e.target.value))}
+                      className="h-10 text-sm font-mono pr-6 text-center"
                     />
-                    <span className="absolute right-2 top-2 text-[10px] text-muted-foreground pointer-events-none">
+                    <span className="absolute right-2 top-3 text-[10px] text-muted-foreground pointer-events-none">
                       pt
                     </span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setFontSize((s) => Math.min(144, Math.round((s + 0.5) * 10) / 10))}
-                    className="size-8 shrink-0 rounded-md border flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => setFontSize((s) => Math.min(144, Math.round(((Number.isFinite(s) ? s : initialValues.fontSize) + 0.5) * 10) / 10))}
+                    aria-label="Increase font size"
+                    className="size-10 shrink-0 rounded-md border flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                     title="Increase font size"
                   >
                     <Plus className="size-3" />
@@ -291,24 +292,27 @@ export function TextReplaceModal({
           </div>
 
           {/* Colors (Text Color + Background Fill Color) */}
-          <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-2">
             {/* Text Color */}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Text Color</Label>
               <div className="flex items-center gap-2">
-                <label className="relative size-8 shrink-0 cursor-pointer rounded-lg border overflow-hidden shadow-xs">
+                <label className="relative size-10 shrink-0 cursor-pointer rounded-lg border overflow-hidden shadow-xs">
                   <input
                     type="color"
-                    value={textColor}
+                    value={safeTextColor}
                     onChange={(e) => setTextColor(e.target.value)}
+                    aria-label="Pick text colour"
                     className="absolute inset-0 size-full cursor-pointer opacity-0"
                   />
-                  <div className="size-full" style={{ backgroundColor: textColor }} />
+                  <div className="size-full" style={{ backgroundColor: safeTextColor }} />
                 </label>
                 <Input
                   value={textColor}
-                  onChange={(e) => setTextColor(e.target.value)}
-                  className="h-8 text-xs font-mono uppercase"
+                  onChange={(e) => setTextColor(e.target.value.trim())}
+                  aria-label="Text colour hex"
+                  maxLength={7}
+                  className="h-10 text-sm font-mono uppercase"
                 />
               </div>
             </div>
@@ -317,39 +321,41 @@ export function TextReplaceModal({
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Background Cover</Label>
               <div className="flex items-center gap-2">
-                <label className="relative size-8 shrink-0 cursor-pointer rounded-lg border overflow-hidden shadow-xs">
+                <label className="relative size-10 shrink-0 cursor-pointer rounded-lg border overflow-hidden shadow-xs">
                   <input
                     type="color"
-                    value={bgColor}
+                    value={safeBgColor}
                     onChange={(e) => setBgColor(e.target.value)}
+                    aria-label="Pick background colour"
                     className="absolute inset-0 size-full cursor-pointer opacity-0"
                   />
-                  <div className="size-full" style={{ backgroundColor: bgColor }} />
+                  <div className="size-full" style={{ backgroundColor: safeBgColor }} />
                 </label>
                 <Input
                   value={bgColor}
-                  onChange={(e) => setBgColor(e.target.value)}
-                  className="h-8 text-xs font-mono uppercase"
+                  onChange={(e) => setBgColor(e.target.value.trim())}
+                  aria-label="Background colour hex"
+                  maxLength={7}
+                  className="h-10 text-sm font-mono uppercase"
                 />
               </div>
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t">
+          <DialogFooter className="gap-2 border-t pt-2">
             <Button
               type="button"
               variant="outline"
-              size="sm"
               onClick={handleErase}
-              className="text-destructive hover:bg-destructive/10 hover:text-destructive mr-auto"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive sm:mr-auto"
               title="Erase original text without adding replacement"
             >
               <Eraser className="size-3.5 mr-1" /> Erase (Blank)
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+            <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" size="sm">
+            <Button type="submit">
               <Check className="size-3.5 mr-1" /> Apply Replacement
             </Button>
           </DialogFooter>

@@ -245,7 +245,7 @@ export function BookmarkManager() {
                   aria-pressed={activeTag === t}
                   onClick={() => setTag(activeTag === t ? null : t)}
                   className={cn(
-                    "inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-2.5 text-xs font-medium transition-colors",
+                    "inline-flex h-9 shrink-0 items-center gap-1 rounded-full px-2.5 text-xs font-medium transition-colors",
                     activeTag === t ? "bg-secondary text-secondary-foreground ring-1 ring-primary/40" : "text-muted-foreground hover:bg-muted"
                   )}
                 >
@@ -355,7 +355,7 @@ function BookmarkCard({ bookmark: b, onEdit, onDelete, onTag }: { bookmark: Book
           <p className="truncate text-xs text-muted-foreground">{host}</p>
         </div>
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`More actions for ${b.title}`} className="-mr-1" />}>
+          <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label={`More actions for ${b.title}`} className="-mr-1" />}>
             <EllipsisVertical aria-hidden />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-40">

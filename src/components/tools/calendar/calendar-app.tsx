@@ -246,7 +246,7 @@ export function CalendarApp() {
                 <Button variant="outline" disabled={searching} onClick={() => goTo(now)}>
                   Today
                 </Button>
-                <h2 className="ml-1 min-w-0 text-lg font-semibold sm:text-xl" aria-live="polite">
+                <h2 className="ml-1 min-w-0 text-base font-semibold sm:text-xl" aria-live="polite">
                   {searching ? (
                     <span className="block truncate px-1.5">Next 12 months</span>
                   ) : (
@@ -260,7 +260,7 @@ export function CalendarApp() {
                           />
                         }
                       >
-                        <span className="truncate">{title}</span>
+                        <span className="leading-tight text-balance sm:truncate">{title}</span>
                         <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                       </PopoverTrigger>
                       <PopoverContent align="start" className="w-64">
@@ -357,7 +357,8 @@ export function CalendarApp() {
               >
                 <SquareCheck aria-hidden />
                 <span>
-                  <span className="sr-only sm:not-sr-only">Show </span>tasks
+                  <span className="sm:hidden">Tasks</span>
+                  <span className="hidden sm:inline">Show tasks</span>
                 </span>
               </Button>
             </div>

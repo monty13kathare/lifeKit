@@ -238,6 +238,10 @@ export function SettingsView() {
             • If an AI key is configured, AI features (AI tools, quick add, planning, Learn feedback) send only the text you choose to Google&apos;s Gemini
             API through this app&apos;s server. Nothing is sent unless you use those features.
           </li>
+          <li>
+            • SecureShare public links upload only the already-encrypted package to a third-party file relay (sto.care); the
+            decryption key stays in the link. Turn off &quot;Generate Public Link&quot; to keep everything on your device.
+          </li>
           <li>• Camera, microphone and notification permissions are only requested when you tap a button that needs them.</li>
           <li>• Local storage is not a secure vault. Use the Sensitive option in Important Info to encrypt details.</li>
         </ul>

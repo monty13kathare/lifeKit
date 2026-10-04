@@ -153,9 +153,11 @@ interface HealthProfileFormProps {
   weightUnit: WeightUnit
   onHeightUnitChange: (u: HeightUnit) => void
   onWeightUnitChange: (u: WeightUnit) => void
+  /** Called after a successful save (e.g. to collapse the form). */
+  onSaved?: () => void
 }
 
-export function HealthProfileForm({ profile, setProfile, heightUnit, weightUnit, onHeightUnitChange, onWeightUnitChange }: HealthProfileFormProps) {
+export function HealthProfileForm({ profile, setProfile, heightUnit, weightUnit, onHeightUnitChange, onWeightUnitChange, onSaved }: HealthProfileFormProps) {
   const {
     register,
     control,
@@ -223,7 +225,8 @@ export function HealthProfileForm({ profile, setProfile, heightUnit, weightUnit,
     if (patch.weightKg !== undefined) patch.weightLog = withWeightLogged(profile.weightLog, patch.weightKg, todayString())
     setProfile(patch)
     reset(values)
-    toast.success("Health profile saved", { description: "Your numbers below have been updated." })
+    toast.success("Health profile saved", { description: "Your numbers have been updated." })
+    onSaved?.()
   }
 
   const selectField = (
@@ -272,7 +275,7 @@ export function HealthProfileForm({ profile, setProfile, heightUnit, weightUnit,
       </div>
 
       <form noValidate onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-3 sm:grid-cols-2">
           <FormField label="Age" error={errors.age?.message}>
             {(p) => <Input {...p} inputMode="numeric" placeholder="e.g. 32" autoComplete="off" {...register("age")} className="h-11" />}
           </FormField>

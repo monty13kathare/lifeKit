@@ -296,28 +296,30 @@ export function GoalDetail({ goal, today, onBack, onEdit, onDelete }: GoalDetail
                       {linked.length ? (
                         <ul className="mt-2 space-y-1" aria-label={`Tasks for "${m.title}"`}>
                           {linked.map((t) => (
-                            <li key={t.id} className="flex min-h-10 items-center gap-2.5 rounded-lg px-1 hover:bg-surface-muted">
-                              {t.recurrence === "none" ? (
-                                <Checkbox
-                                  checked={t.completed}
-                                  onCheckedChange={() => toggleTask(t)}
-                                  aria-label={t.completed ? `Mark "${t.title}" not done` : `Complete "${t.title}"`}
-                                  className="size-5"
-                                />
-                              ) : (
-                                <span className="flex size-5 items-center justify-center text-muted-foreground" title="Repeating task — complete it in Tasks">
-                                  <Repeat className="size-4" aria-label="Repeating task" />
+                            <li key={t.id}>
+                              <label className="flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-1 hover:bg-surface-muted">
+                                {t.recurrence === "none" ? (
+                                  <Checkbox
+                                    checked={t.completed}
+                                    onCheckedChange={() => toggleTask(t)}
+                                    aria-label={t.completed ? `Mark "${t.title}" not done` : `Complete "${t.title}"`}
+                                    className="size-5"
+                                  />
+                                ) : (
+                                  <span className="flex size-5 items-center justify-center text-muted-foreground" title="Repeating task — complete it in Tasks">
+                                    <Repeat className="size-4" aria-label="Repeating task" />
+                                  </span>
+                                )}
+                                <span className={cn("min-w-0 flex-1 text-sm wrap-break-word", t.completed && "text-muted-foreground line-through")}>
+                                  {t.title}
                                 </span>
-                              )}
-                              <span className={cn("min-w-0 flex-1 text-sm wrap-break-word", t.completed && "text-muted-foreground line-through")}>
-                                {t.title}
-                              </span>
-                              {t.dueDate && !t.completed ? (
-                                <span className="hidden text-xs text-muted-foreground sm:inline">{formatShort(t.dueDate)}</span>
-                              ) : null}
-                              <span className={cn("rounded-md px-1.5 py-0.5 text-[0.7rem] font-medium", PRIORITY_CLASS[t.priority])}>
-                                {PRIORITY_LABEL[t.priority]}
-                              </span>
+                                {t.dueDate && !t.completed ? (
+                                  <span className="hidden text-xs text-muted-foreground sm:inline">{formatShort(t.dueDate)}</span>
+                                ) : null}
+                                <span className={cn("rounded-md px-1.5 py-0.5 text-[0.7rem] font-medium", PRIORITY_CLASS[t.priority])}>
+                                  {PRIORITY_LABEL[t.priority]}
+                                </span>
+                              </label>
                             </li>
                           ))}
                         </ul>

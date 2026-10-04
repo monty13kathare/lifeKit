@@ -212,7 +212,6 @@ export function SignaturePad({ open, onOpenChange, saved, onUse }: SignaturePadP
             <img src={saved.src} alt="Your last signature" className="h-12 max-w-40 rounded bg-white object-contain p-1" />
             <Button
               variant="outline"
-              size="sm"
               className="ml-auto"
               onClick={() => {
                 onUse(saved)

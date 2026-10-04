@@ -71,7 +71,7 @@ export function viewTitle(view: CalendarView, cursor: Date): string {
       return `${format(s, "MMM d, yyyy")} – ${format(e, "MMM d, yyyy")}`
     }
     case "day":
-      return format(cursor, "EEEE, MMMM d, yyyy")
+      return format(cursor, "EEE, MMM d, yyyy")
     case "agenda": {
       const e = addDays(cursor, AGENDA_DAYS - 1)
       return `${format(cursor, "MMM d")} – ${format(e, "MMM d, yyyy")}`

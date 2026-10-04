@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { answerXp, LIVES, timeLimit } from "@/lib/learn/fun"
 import { cn } from "@/lib/utils"
 import type { FunLanguage, FunMode, FunQuestion } from "@/types"
+import { haptic } from "./celebrate"
 import { tr, type ActiveQuiz } from "./fun-utils"
 
 export interface GameSummary {
@@ -72,6 +73,7 @@ export function QuizPlayer({ quiz, mode, onFinish, onQuit }: { quiz: ActiveQuiz;
     setGain(earned)
     setCheer(Math.floor(Math.random() * 12))
     if (!right && mode === "survival") setLives((l) => l - 1)
+    haptic(right ? 25 : [70, 50, 70])
   }
 
   const next = () => {
@@ -104,6 +106,11 @@ export function QuizPlayer({ quiz, mode, onFinish, onQuit }: { quiz: ActiveQuiz;
     setHintShown(true)
     setHintsLeft((h) => h - 1)
   }
+
+  // Each question (and its story) starts at the top on small screens.
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }, [index])
 
   // Speed Round countdown.
   const onTick = useEffectEvent(() => {
@@ -206,8 +213,8 @@ export function QuizPlayer({ quiz, mode, onFinish, onQuit }: { quiz: ActiveQuiz;
                       "flex min-h-12 w-full items-center gap-3 rounded-xl border-2 px-3 py-2.5 text-left transition-all",
                       !revealed && !gone && "hover:border-primary/50 hover:bg-primary/5 active:scale-[0.99]",
                       gone && "opacity-30 line-through",
-                      revealed && isAnswer && "border-success bg-success/10",
-                      revealed && isPicked && !isAnswer && "border-destructive bg-destructive/10",
+                      revealed && isAnswer && "border-success bg-success/10 animate-in zoom-in-95 duration-300",
+                      revealed && isPicked && !isAnswer && "border-destructive bg-destructive/10 animate-lk-shake",
                       revealed && !isAnswer && !isPicked && "opacity-60"
                     )}
                   >
@@ -222,11 +229,11 @@ export function QuizPlayer({ quiz, mode, onFinish, onQuit }: { quiz: ActiveQuiz;
                       {revealed && isAnswer ? <Check className="size-4" /> : revealed && isPicked ? <X className="size-4" /> : String.fromCharCode(65 + i)}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block break-words" lang={lang === "hi" ? "hi" : "en"}>
+                      <span className="block wrap-break-word" lang={lang === "hi" ? "hi" : "en"}>
                         {opt}
                       </span>
                       {q.hindi?.options[i] && (
-                        <span className="block text-sm break-words text-muted-foreground" lang="hi">
+                        <span className="block text-sm wrap-break-word text-muted-foreground" lang="hi">
                           {q.hindi.options[i]}
                         </span>
                       )}

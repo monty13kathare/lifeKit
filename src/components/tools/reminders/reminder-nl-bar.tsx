@@ -146,6 +146,7 @@ export function ReminderNlBar({ onSave, onEdit }: ReminderNlBarProps) {
               <Button
                 ref={saveRef}
                 size="sm"
+                className="h-10 sm:h-8"
                 disabled={isPast}
                 onClick={() => {
                   onSave(preview)
@@ -157,6 +158,7 @@ export function ReminderNlBar({ onSave, onEdit }: ReminderNlBarProps) {
               </Button>
               <Button
                 size="sm"
+                className="h-10 sm:h-8"
                 variant="outline"
                 onClick={() => {
                   onEdit(preview)
@@ -166,7 +168,7 @@ export function ReminderNlBar({ onSave, onEdit }: ReminderNlBarProps) {
               >
                 <Pencil aria-hidden /> Edit
               </Button>
-              <Button size="sm" variant="ghost" onClick={cancel}>
+              <Button size="sm" variant="ghost" className="h-10 sm:h-8" onClick={cancel}>
                 <X aria-hidden /> Cancel
               </Button>
             </div>

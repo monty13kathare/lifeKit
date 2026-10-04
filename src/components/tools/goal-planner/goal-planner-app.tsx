@@ -151,9 +151,11 @@ export function GoalPlannerApp() {
         />
       ) : (
         <div className="space-y-4">
-          <Button size="lg" className="w-full sm:hidden" onClick={() => setForm({ open: true })}>
-            <Plus aria-hidden /> New goal
-          </Button>
+          {goals.length > 0 ? (
+            <Button size="lg" className="w-full sm:hidden" onClick={() => setForm({ open: true })}>
+              <Plus aria-hidden /> New goal
+            </Button>
+          ) : null}
 
           {goals.length === 0 ? (
             <EmptyState
@@ -173,7 +175,7 @@ export function GoalPlannerApp() {
           ) : (
             <>
               <Tabs value={tab} onValueChange={(v) => setTab(v as Status)}>
-                <TabsList className="w-full sm:w-auto">
+                <TabsList className="h-11! w-full sm:w-auto">
                   {(["active", "achieved", "archived"] as Status[]).map((s) => (
                     <TabsTrigger key={s} value={s} className="px-3">
                       {GOAL_STATUS_LABEL[s]}

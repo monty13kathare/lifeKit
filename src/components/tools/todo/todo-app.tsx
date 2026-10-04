@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 import { CalendarCheck2, CalendarClock, CircleCheckBig, FilterX, ListTodo, Plus, Search, SearchX, Sparkles, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
@@ -69,7 +68,6 @@ export function TodoApp() {
   const [quick, setQuick] = useState("")
   const [confirmClear, setConfirmClear] = useState(false)
   const [query, setQuery] = useState("")
-  const router = useRouter()
   const ai = useAiStatus()
   const aiConfigured = !!ai?.configured
   const breakdown = useSubtaskSuggestions()
@@ -198,10 +196,9 @@ export function TodoApp() {
     } else {
       add({ ...draft, completed: false, createdAt: new Date().toISOString() })
       toast.success("Task created", { description: draft.title })
-      if (sheet.fromQuick) {
-        setQuick("")
-        setView(viewFor(draft.dueDate))
-      }
+      // Jump to the tab where the new task lands so it's visible.
+      setView(viewFor(draft.dueDate))
+      if (sheet.fromQuick) setQuick("")
     }
     setSheet({ open: false })
   }
@@ -412,7 +409,7 @@ export function TodoApp() {
             <div className="lg:hidden">{filters}</div>
 
             <Tabs value={view} onValueChange={(v) => setView(v as View)} className="gap-4">
-              <TabsList className="w-full sm:w-fit">
+              <TabsList className="h-11! w-full sm:w-fit">
                 <TabsTrigger value="today" className="px-3">
                   Today <TabCount n={counts.today} alert={overdue.length > 0} />
                 </TabsTrigger>
@@ -699,7 +696,20 @@ function FilterSelect({
       <span className="mb-1 hidden text-xs font-medium text-muted-foreground lg:block">{label}</span>
       <Select items={items} value={value} onValueChange={(v) => v && onChange(v)}>
         <SelectTrigger aria-label={label} className="w-full min-w-0 bg-card text-xs sm:text-sm">
-          <SelectValue />
+          {/* "All categories" doesn't fit three-across on phones; show the short label there. */}
+          <SelectValue>
+            {(v: string) => {
+              const full = items.find((i) => i.value === v)?.label ?? v
+              return v === "all" ? (
+                <>
+                  <span className="lg:hidden">{label}</span>
+                  <span className="hidden lg:inline">{full}</span>
+                </>
+              ) : (
+                full
+              )
+            }}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {items.map((i) => (

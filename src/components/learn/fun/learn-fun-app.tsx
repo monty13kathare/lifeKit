@@ -233,7 +233,7 @@ export function LearnFunApp() {
   const isCustom = setup.category === CUSTOM_CATEGORY
 
   return (
-    <ToolPage toolId="learn" backHref="/" width="default">
+    <ToolPage toolId="learn" hideBack>
       {view.name === "loading" ? (
         <LoadingCard lang={lang} onCancel={cancelLoading} />
       ) : !hydrated ? (
@@ -267,7 +267,7 @@ export function LearnFunApp() {
               <MiniStat value={`🔥 ${liveDayStreak(stats)}`} label={tr(lang, { en: "Day streak", hi: "दिन लगातार" })} />
               <MiniStat value={`${accuracy}%`} label={tr(lang, { en: "Accuracy", hi: "सटीकता" })} />
               <MiniStat value={String(stats.games)} label={tr(lang, { en: "Games", hi: "खेल" })} />
-              <MiniStat value={`⚡ ${stats.bestCombo}`} label={tr(lang, { en: "Best combo", hi: "बेस्ट कॉम्बो" })} />
+              <MiniStat value={`⚡ ${stats.bestCombo}`} label={tr(lang, { en: "Combo", hi: "कॉम्बो" })} />
             </div>
           </section>
 

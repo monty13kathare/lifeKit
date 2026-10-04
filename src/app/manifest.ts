@@ -23,7 +23,7 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icons/icon.svg", sizes: "any", type: "image/svg+xml" },
     ],
     shortcuts: [
-      { name: "Scan", short_name: "Scan", url: "/scan", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+      { name: "Learn with Fun", short_name: "Learn", url: "/learn", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Image to PDF", short_name: "To PDF", url: "/tools/image-to-pdf", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Tasks", short_name: "Tasks", url: "/tools/todo", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
       { name: "Calculator", short_name: "Calc", url: "/tools/calculators/smart", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },

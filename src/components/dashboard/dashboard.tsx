@@ -2,11 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { ThemeToggle } from "@/components/navigation/theme-toggle"
-import { ProfileMenu } from "@/components/navigation/profile-menu"
 import {
   ArrowRight,
-  Bell,
   ChevronRight,
   FileText,
   Image as ImageIcon,
@@ -15,7 +12,6 @@ import {
   LayoutGrid,
   Shrink,
   MoreHorizontal,
-  File,
   MoreVertical,
   Repeat,
   ListTodo,
@@ -96,9 +92,11 @@ function FilterChip({
 }) {
   return (
     <button
+      type="button"
+      aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "flex shrink-0 items-center gap-1.5 rounded-full px-4 py-1.5 text-[11px] font-bold sm:text-xs transition-colors",
+        "flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-xs font-bold transition-colors",
         active
           ? "bg-primary text-primary-foreground shadow-sm"
           : "bg-card text-muted-foreground shadow-soft border border-border/50 hover:bg-muted"
@@ -220,7 +218,7 @@ export function Dashboard() {
         <div className="mt-8">
           <div className="mb-4 flex items-center justify-between px-1">
             <h3 className="text-lg font-bold text-foreground tracking-tight">Popular Tools</h3>
-            <Link href="/tools" className="flex items-center gap-0.5 rounded-full bg-card px-3 py-1.5 text-[10px] font-bold text-muted-foreground shadow-soft hover:text-foreground transition-colors border border-border/50">
+            <Link href="/tools" className="flex min-h-10 items-center gap-0.5 rounded-full bg-card px-3.5 text-xs font-bold text-muted-foreground shadow-soft hover:text-foreground transition-colors border border-border/50">
               View All <ChevronRight className="size-3" strokeWidth={3} />
             </Link>
           </div>

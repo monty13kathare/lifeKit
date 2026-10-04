@@ -141,7 +141,7 @@ export function NoteEditor({ note, onSave, onUpdateMeta, onDelete, onDuplicate, 
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 sm:px-4">
+      <div className="flex items-center gap-2 border-b px-3 py-2 sm:px-4">
         {onBack ? (
           <Button
             variant="ghost"
@@ -157,10 +157,16 @@ export function NoteEditor({ note, onSave, onUpdateMeta, onDelete, onDuplicate, 
           </Button>
         ) : null}
         <SourceBadge source={note.source} />
-        <span className="text-xs text-muted-foreground" aria-live="polite">
-          {status === "saving" ? "Saving…" : `Saved · ${format(parseISO(note.updatedAt), "MMM d, h:mm a")}`}
+        <span className="min-w-0 truncate text-xs text-muted-foreground" aria-live="polite">
+          {status === "saving" ? (
+            "Saving…"
+          ) : (
+            <>
+              Saved<span className="hidden sm:inline"> · {format(parseISO(note.updatedAt), "MMM d, h:mm a")}</span>
+            </>
+          )}
         </span>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           <Button
             variant="ghost"
             size="icon"

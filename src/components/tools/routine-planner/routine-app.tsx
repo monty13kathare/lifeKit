@@ -234,7 +234,7 @@ export function RoutineApp() {
             {/* Week strip */}
             <nav aria-label="Choose a day" className="rounded-2xl border bg-card p-2 shadow-soft">
               <div className="mb-1 flex items-center justify-between px-1">
-                <Button variant="ghost" size="icon-sm" aria-label="Previous week" onClick={() => setWeekOffset((w) => w - 1)}>
+                <Button variant="ghost" size="icon" aria-label="Previous week" onClick={() => setWeekOffset((w) => w - 1)}>
                   <ChevronLeft aria-hidden />
                 </Button>
                 <p className="text-sm font-medium" aria-live="polite">
@@ -242,11 +242,11 @@ export function RoutineApp() {
                 </p>
                 <div className="flex items-center">
                   {!isToday || weekOffset !== 0 ? (
-                    <Button variant="ghost" size="sm" onClick={() => selectDate(now)}>
+                    <Button variant="ghost" className="h-10" onClick={() => selectDate(now)}>
                       Today
                     </Button>
                   ) : null}
-                  <Button variant="ghost" size="icon-sm" aria-label="Next week" onClick={() => setWeekOffset((w) => w + 1)}>
+                  <Button variant="ghost" size="icon" aria-label="Next week" onClick={() => setWeekOffset((w) => w + 1)}>
                     <ChevronRight aria-hidden />
                   </Button>
                 </div>
@@ -302,7 +302,7 @@ export function RoutineApp() {
                     aria-checked={sortMode === m}
                     onClick={() => setSortMode(m)}
                     className={cn(
-                      "h-8 rounded-md px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                      "h-9 rounded-md px-3 text-xs font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
                       sortMode === m ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                     )}
                   >
@@ -313,10 +313,10 @@ export function RoutineApp() {
             </div>
             {dayItems.length > 0 && !isFuture ? (
               <div className="-mt-2 flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" disabled={doneCount === dayItems.length} onClick={() => setDayDone(true)}>
+                <Button variant="outline" disabled={doneCount === dayItems.length} onClick={() => setDayDone(true)}>
                   <CheckCheck aria-hidden /> Mark all done
                 </Button>
-                <Button size="sm" variant="ghost" disabled={doneCount === 0} onClick={() => setDayDone(false)}>
+                <Button variant="ghost" disabled={doneCount === 0} onClick={() => setDayDone(false)}>
                   <RotateCcw aria-hidden /> Reset day
                 </Button>
               </div>
@@ -405,7 +405,7 @@ export function RoutineApp() {
                                 {canDrag ? <GripVertical className="mr-1 size-4 self-center opacity-60" aria-hidden /> : null}
                                 <Button
                                   variant="ghost"
-                                  size="icon-sm"
+                                  size="icon"
                                   className="bg-background/60"
                                   aria-label={`Move ${item.title} up`}
                                   disabled={idx === 0}
@@ -415,7 +415,7 @@ export function RoutineApp() {
                                 </Button>
                                 <Button
                                   variant="ghost"
-                                  size="icon-sm"
+                                  size="icon"
                                   className="bg-background/60"
                                   aria-label={`Move ${item.title} down`}
                                   disabled={idx === dayItems.length - 1}

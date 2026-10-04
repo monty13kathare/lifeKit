@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Settings, UserRound } from "lucide-react"
+import { Ellipsis, Settings, UserRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -47,6 +47,9 @@ export function ProfileMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href="/settings" />}>
           <Settings className="size-4" /> Settings
+        </DropdownMenuItem>
+        <DropdownMenuItem render={<Link href="/more" />}>
+          <Ellipsis className="size-4" /> More
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

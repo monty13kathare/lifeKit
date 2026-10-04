@@ -175,7 +175,7 @@ export function ImageToPdfTool() {
               {items.length} page{items.length === 1 ? "" : "s"}
               <span className="ml-2 hidden text-sm font-normal text-muted-foreground lg:inline">Drag to reorder</span>
             </h2>
-            <Button type="button" variant="ghost" size="sm" onClick={clearAll} disabled={busy}>
+            <Button type="button" variant="ghost" onClick={clearAll} disabled={busy}>
               <Trash2 aria-hidden /> Clear all
             </Button>
           </div>
@@ -227,7 +227,6 @@ export function ImageToPdfTool() {
             </div>
             <Button
               variant="outline"
-              size="sm"
               render={<a href={result.url} target="_blank" rel="noopener noreferrer" />}
               nativeButton={false}
             >
@@ -247,7 +246,7 @@ export function ImageToPdfTool() {
             />
           ) : (
             <Notice tone="info" title="Preview isn't available in this browser">
-              Your browser doesn't support inline PDF previews. Use the Download or Open buttons above to view the generated document.
+              Your browser doesn&apos;t support inline PDF previews. Use the Download or Open buttons above to view the generated document.
             </Notice>
           )}
         </motion.section>

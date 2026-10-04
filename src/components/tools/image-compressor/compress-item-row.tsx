@@ -124,10 +124,10 @@ export function CompressItemRow({ item, stale, busy, onCompare, onDownload, onRe
       {r && bigger && !stale ? (
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-warning/10 p-2 text-xs">
           <span className="min-w-0 flex-1">This file got bigger. The original is already well optimised.</span>
-          <Button size="sm" variant="outline" onClick={() => onDownload(true)} disabled={busy}>
+          <Button variant="outline" onClick={() => onDownload(true)} disabled={busy}>
             Keep original
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => onDownload(false)} disabled={busy}>
+          <Button variant="ghost" onClick={() => onDownload(false)} disabled={busy}>
             Download anyway
           </Button>
         </div>

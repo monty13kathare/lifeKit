@@ -526,7 +526,7 @@ export function PdfEditorWorkspace({ session, onClose }: { session: EditorSessio
           tone="success"
           title="Your edited PDF is ready"
           action={
-            <Button size="sm" variant="outline" onClick={save}>
+            <Button variant="outline" onClick={save}>
               <Download aria-hidden /> Download again
             </Button>
           }
@@ -638,7 +638,7 @@ export function PdfEditorWorkspace({ session, onClose }: { session: EditorSessio
             <ToolOptions {...toolOptionProps} compact />
           </div>
         )}
-        <div className="mx-auto grid max-w-lg grid-cols-6" role="toolbar" aria-label="Editor tools">
+        <div className="mx-auto grid max-w-lg grid-cols-7" role="toolbar" aria-label="Editor tools">
           {TOOLS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -646,22 +646,22 @@ export function PdfEditorWorkspace({ session, onClose }: { session: EditorSessio
               aria-pressed={tool === id}
               onClick={() => setTool(id)}
               className={cn(
-                "flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium outline-none focus-visible:bg-muted",
+                "flex h-14 min-w-0 flex-col items-center justify-center gap-0.5 text-[11px] font-medium outline-none focus-visible:bg-muted",
                 tool === id ? "text-primary" : "text-muted-foreground"
               )}
             >
-              <span className={cn("flex h-7 w-11 items-center justify-center rounded-full", tool === id && "bg-primary/10")}>
+              <span className={cn("flex h-7 w-10 items-center justify-center rounded-full", tool === id && "bg-primary/10")}>
                 <Icon className="size-5" aria-hidden />
               </span>
-              {label}
+              <span className="max-w-full truncate px-0.5">{label}</span>
             </button>
           ))}
           <button
             type="button"
             onClick={openSign}
-            className="flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground outline-none focus-visible:bg-muted"
+            className="flex h-14 min-w-0 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground outline-none focus-visible:bg-muted"
           >
-            <span className="flex h-7 w-11 items-center justify-center rounded-full">
+            <span className="flex h-7 w-10 items-center justify-center rounded-full">
               <Signature className="size-5" aria-hidden />
             </span>
             Sign
@@ -673,9 +673,9 @@ export function PdfEditorWorkspace({ session, onClose }: { session: EditorSessio
               setMoreOpen(true)
             }}
             aria-haspopup="dialog"
-            className="flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground outline-none focus-visible:bg-muted"
+            className="flex h-14 min-w-0 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground outline-none focus-visible:bg-muted"
           >
-            <span className="flex h-7 w-11 items-center justify-center rounded-full">
+            <span className="flex h-7 w-10 items-center justify-center rounded-full">
               <Ellipsis className="size-5" aria-hidden />
             </span>
             More

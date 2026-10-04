@@ -161,49 +161,49 @@ export function PageCanvas(props: PageCanvasProps) {
     })
   }
 
+  const editTargetFor = (a: TextReplaceAnnotation): ModalTarget => ({
+    mode: "edit",
+    annotation: a,
+    originalText: a.originalText || a.text,
+    initialValues: {
+      text: a.text,
+      fontSize: a.fontSize,
+      fontFamily: a.fontFamily,
+      fontWeight: a.fontWeight,
+      textColor: a.color,
+      bgColor: a.bgColor,
+    },
+  })
+
   const handleEditExistingReplace = (a: TextReplaceAnnotation) => {
     onSelect(a.id)
-    setModalTarget({
-      mode: "edit",
-      annotation: a,
-      originalText: a.originalText || a.text,
-      initialValues: {
-        text: a.text,
-        fontSize: a.fontSize,
-        fontFamily: a.fontFamily,
-        fontWeight: a.fontWeight,
-        textColor: a.color,
-        bgColor: a.bgColor,
-      },
-    })
+    setModalTarget(editTargetFor(a))
   }
 
-  // Automatically open modal if an existing text-replace annotation is targeted for editing
-  useEffect(() => {
-    if (!editingId) return
-    const a = annotations.find((x) => x.id === editingId && x.type === "text-replace") as TextReplaceAnnotation | undefined
-    if (a) {
-      handleEditExistingReplace(a)
-    }
-  }, [editingId, annotations])
+  // "Edit" from the toolbar sets editingId on a replaced-text annotation:
+  // derive the modal from it instead of syncing state in an effect.
+  const editingReplace = editingId
+    ? (annotations.find((x) => x.id === editingId && x.type === "text-replace") as TextReplaceAnnotation | undefined)
+    : undefined
+  const activeModal: ModalTarget = modalTarget ?? (editingReplace ? editTargetFor(editingReplace) : null)
 
   const handleApplyReplace = (values: TextReplaceValues) => {
-    if (!modalTarget) return
+    if (!activeModal) return
 
-    if (modalTarget.mode === "create") {
-      const lenRatio = values.text.length / Math.max(1, modalTarget.originalText.length)
-      const w = Math.min(1 - modalTarget.item.x, Math.max(modalTarget.item.w, modalTarget.item.w * lenRatio))
+    if (activeModal.mode === "create") {
+      const lenRatio = values.text.length / Math.max(1, activeModal.originalText.length)
+      const w = Math.min(1 - activeModal.item.x, Math.max(activeModal.item.w, activeModal.item.w * lenRatio))
 
       const a: TextReplaceAnnotation = {
         id: uid("ann"),
         type: "text-replace",
-        x: modalTarget.item.x,
-        y: modalTarget.item.y,
+        x: activeModal.item.x,
+        y: activeModal.item.y,
         w,
-        h: modalTarget.item.h,
-        baselineY: modalTarget.item.baselineY,
+        h: activeModal.item.h,
+        baselineY: activeModal.item.baselineY,
         text: values.text,
-        originalText: modalTarget.originalText,
+        originalText: activeModal.originalText,
         fontSize: values.fontSize,
         fontFamily: values.fontFamily,
         fontWeight: values.fontWeight,
@@ -214,7 +214,7 @@ export function PageCanvas(props: PageCanvasProps) {
       onAdd(a)
       onSelect(a.id)
     } else {
-      onUpdate(modalTarget.annotation.id, {
+      onUpdate(activeModal.annotation.id, {
         text: values.text,
         fontSize: values.fontSize,
         fontFamily: values.fontFamily,
@@ -226,29 +226,29 @@ export function PageCanvas(props: PageCanvasProps) {
   }
 
   const handleEraseReplace = () => {
-    if (!modalTarget) return
-    if (modalTarget.mode === "create") {
+    if (!activeModal) return
+    if (activeModal.mode === "create") {
       const a: TextReplaceAnnotation = {
         id: uid("ann"),
         type: "text-replace",
-        x: modalTarget.item.x,
-        y: modalTarget.item.y,
-        w: modalTarget.item.w,
-        h: modalTarget.item.h,
-        baselineY: modalTarget.item.baselineY,
+        x: activeModal.item.x,
+        y: activeModal.item.y,
+        w: activeModal.item.w,
+        h: activeModal.item.h,
+        baselineY: activeModal.item.baselineY,
         text: "",
-        originalText: modalTarget.originalText,
-        fontSize: modalTarget.item.fontSize,
-        fontFamily: modalTarget.item.fontFamily,
-        fontWeight: modalTarget.item.fontWeight,
+        originalText: activeModal.originalText,
+        fontSize: activeModal.item.fontSize,
+        fontFamily: activeModal.item.fontFamily,
+        fontWeight: activeModal.item.fontWeight,
         color: "#ffffff",
-        bgColor: modalTarget.initialValues.bgColor || "#ffffff",
+        bgColor: activeModal.initialValues.bgColor || "#ffffff",
         rotation: 0,
       }
       onAdd(a)
       onSelect(a.id)
     } else {
-      onUpdate(modalTarget.annotation.id, {
+      onUpdate(activeModal.annotation.id, {
         text: "",
       })
     }
@@ -788,34 +788,43 @@ export function PageCanvas(props: PageCanvasProps) {
           )
         })}
 
-        {/* Interactive PDF Text Layer for selecting/editing any existing text */}
-        {(tool === "select" || tool === "edit-text") && (
+        {/* Interactive PDF text layer for replacing existing text. Only in the
+            Edit text tool: in Select mode it sat on top of annotations and
+            stole taps meant for them. */}
+        {tool === "edit-text" && (
           <div className="pdf-text-layer absolute inset-0 select-text pointer-events-none">
-            {textItems.map((item) => (
-              <span
-                key={item.id}
-                className={cn(
-                  "absolute pointer-events-auto cursor-pointer rounded-[2px] transition-all",
-                  tool === "edit-text"
-                    ? "hover:bg-primary/20 hover:ring-1 hover:ring-primary/60 hover:shadow-xs"
-                    : "hover:bg-primary/10 hover:ring-1 hover:ring-primary/30"
-                )}
-                style={{
-                  left: `${item.x * 100}%`,
-                  top: `${item.y * 100}%`,
-                  width: `${item.w * 100}%`,
-                  height: `${item.h * 100}%`,
-                  fontSize: `${item.fontSize * scale}px`,
-                  lineHeight: 1,
-                  color: "transparent",
-                }}
-                title={`Click to edit or replace: "${item.str}"`}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => handleTextItemClick(e, item)}
-              >
-                {item.str}
-              </span>
-            ))}
+            {textItems.map((item) => {
+              // Text that was already replaced edits that replacement instead of stacking a new one.
+              const replaced = annotations.find(
+                (a): a is TextReplaceAnnotation =>
+                  a.type === "text-replace" && Math.abs(a.x - item.x) < 1e-4 && Math.abs(a.y - item.y) < 1e-4
+              )
+              return (
+                <span
+                  key={item.id}
+                  className="absolute pointer-events-auto cursor-pointer rounded-[2px] transition-all hover:bg-primary/20 hover:ring-1 hover:ring-primary/60 hover:shadow-xs"
+                  style={{
+                    left: `${item.x * 100}%`,
+                    top: `${item.y * 100}%`,
+                    width: `${item.w * 100}%`,
+                    height: `${item.h * 100}%`,
+                    fontSize: `${item.fontSize * scale}px`,
+                    lineHeight: 1,
+                    color: "transparent",
+                  }}
+                  title={`Click to edit or replace: "${item.str}"`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    if (replaced) {
+                      e.stopPropagation()
+                      handleEditExistingReplace(replaced)
+                    } else handleTextItemClick(e, item)
+                  }}
+                >
+                  {item.str}
+                </span>
+              )
+            })}
           </div>
         )}
       </div>
@@ -873,15 +882,16 @@ export function PageCanvas(props: PageCanvasProps) {
           )}
         </div>
       )}
-      {modalTarget && (
+      {activeModal && (
         <TextReplaceModal
-          open={modalTarget !== null}
+          key={activeModal.mode === "edit" ? activeModal.annotation.id : `${activeModal.item.x}:${activeModal.item.y}`}
+          open
           onClose={() => {
             setModalTarget(null)
             onFinishEditing()
           }}
-          originalText={modalTarget.originalText}
-          initialValues={modalTarget.initialValues}
+          originalText={activeModal.originalText}
+          initialValues={activeModal.initialValues}
           onApply={handleApplyReplace}
           onErase={handleEraseReplace}
         />

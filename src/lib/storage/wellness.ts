@@ -1,4 +1,4 @@
-import type { HealthInsight, HealthProfile, WellnessDay, WellnessGoals } from "@/types"
+import type { HealthInsight, HealthPlan, HealthProfile, WellnessDay, WellnessGoals } from "@/types"
 import { createCollectionStore, createValueStore } from "./core"
 
 export const wellnessDaysStore = createCollectionStore<WellnessDay>("wellness-days")
@@ -37,6 +37,9 @@ export const DEFAULT_HEALTH_PROFILE: HealthProfile = {
 }
 
 export const healthProfileStore = createValueStore<HealthProfile>("health-profile", DEFAULT_HEALTH_PROFILE)
+
+/** The latest AI health plan, or null before the first one. */
+export const healthPlanStore = createValueStore<HealthPlan | null>("health-plan", null)
 
 /** Saved AI health checks, newest first (capped by the UI). */
 export const healthInsightsStore = createCollectionStore<HealthInsight>("health-insights")

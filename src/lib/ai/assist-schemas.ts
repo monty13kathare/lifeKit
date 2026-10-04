@@ -142,7 +142,47 @@ export const ASSIST_OUTPUT = {
     sleepTips: z.array(z.string().max(250)).max(4),
     seeDoctor: z.array(z.string().max(300)).max(4),
   }),
-
+  /**
+   * Input JSON: { profile, estimates (incl. calorieTarget + macros), goals, last7Days[], weightTrend, preferences? }.
+   * A full personal plan: diet, a 7-day workout week and a daily routine. Journal entries are never included.
+   */
+  "health-plan": z.object({
+    summary: z.string().min(1).max(700),
+    focus: z.array(z.string().max(120)).max(3),
+    meals: z
+      .array(z.object({ time: z.string().max(12), name: z.string().min(1).max(40), items: z.string().min(1).max(240), kcal: z.number().int().min(0).max(2500) }))
+      .min(3)
+      .max(6),
+    eatMore: z.array(z.string().max(80)).max(6),
+    limit: z.array(z.string().max(80)).max(6),
+    workouts: z
+      .array(
+        z.object({
+          day: z.enum(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]),
+          focus: z.string().min(1).max(60),
+          rest: z.boolean(),
+          minutes: z.number().int().min(0).max(180),
+          exercises: z.array(z.string().max(120)).max(6),
+        })
+      )
+      .min(7)
+      .max(7),
+    routine: z.array(z.object({ time, title: z.string().min(1).max(80), durationMinutes: z.number().int().min(5).max(600) })).min(3).max(12),
+    tips: z.array(z.string().max(250)).max(5),
+    suggestedGoals: z.object({
+      waterGlasses: z.number().int().min(4).max(16).optional(),
+      steps: z.number().int().min(2000).max(20000).optional(),
+      exerciseMinutes: z.number().int().min(10).max(120).optional(),
+      sleepHours: z.number().min(5).max(10).optional(),
+    }),
+    seeDoctor: z.array(z.string().max(300)).max(4),
+  }),
+  /** Input JSON: { question, profile } — one health/fitness/nutrition question. */
+  "health-ask": z.object({
+    answer: z.string().min(1).max(1500),
+    points: z.array(z.string().max(250)).max(5),
+    seeDoctor: z.string().max(300).optional(),
+  }),
 
   /* ------------------------------------------------------------ Learn */
   /** Input JSON: { scenario, goal?, prompt } */

@@ -34,13 +34,21 @@ import { CopyButton } from "@/components/common/copy-button"
 import { EmptyState } from "@/components/common/empty-state"
 import { FileDropzone } from "@/components/common/file-dropzone"
 import { Notice } from "@/components/common/notice"
+import { useAiStatus } from "@/hooks/use-ai-status"
 import { downloadText, loadImage, MB } from "@/lib/files"
 import { openPdf, renderPdfPage } from "@/lib/pdf/pdfjs"
 import { takeOcrHandoff } from "@/lib/qr/session"
 import { saveNote } from "@/lib/storage/notes"
 import { cn } from "@/lib/utils"
 import { OcrCamera } from "./ocr-camera"
-import { OCR_LANGUAGES, languageOf, preprocess, toCanvas, type OcrProgress, type Preprocess } from "./ocr-engine"
+import { Segmented } from "../image-shared/fields"
+import { OCR_LANGUAGES, OcrEngine, languageOf, preprocess, toCanvas, type OcrProgress, type Preprocess } from "./ocr-engine"
+
+type EngineKind = "device" | "ai"
+const ENGINE_OPTIONS: { value: EngineKind; label: string }[] = [
+  { value: "device", label: "On-device" },
+  { value: "ai", label: "Google Gemini" },
+]
 
 type PdfDoc = Awaited<ReturnType<typeof openPdf>>
 
@@ -82,11 +90,16 @@ export function OcrTool() {
   const textRef = useRef<HTMLTextAreaElement>(null)
   const pdfRef = useRef<PdfDoc | null>(null)
   const speechSupported = useSpeechSupported()
+  const ai = useAiStatus()
+  const [engineChoice, setEngineChoice] = useState<EngineKind | null>(null)
+  // Gemini reads more scripts and handwriting; on-device keeps the image in the browser.
+  const engine: EngineKind = ai?.configured ? (engineChoice ?? "ai") : "device"
+  const ocrEngineRef = useRef<OcrEngine | null>(null)
 
   const langs = lang === "eng" || !withEnglish ? [lang] : [lang, "eng"]
 
   const run = useCallback(
-    async (canvas: HTMLCanvasElement, opts: { langs: string[]; pre: Preprocess }) => {
+    async (canvas: HTMLCanvasElement, opts: { langs: string[]; pre: Preprocess; engine: EngineKind }) => {
       setPhase("running")
       setOcrError(null)
       setEditing(false)
@@ -94,7 +107,18 @@ export function OcrTool() {
       try {
         await new Promise((r) => setTimeout(r, 0))
         const input = preprocess(canvas, opts.pre)
-        
+
+        if (opts.engine === "device") {
+          const eng = (ocrEngineRef.current ??= new OcrEngine())
+          eng.setProgressHandler(setProgress)
+          const result = await eng.recognize(input, opts.langs)
+          setText(result.text.trim())
+          setConfidence(result.confidence)
+          setPhase("done")
+          if (!result.text.trim()) toast.info("No text found in this image.")
+          return
+        }
+
         setProgress({ status: "Extracting text with AI...", progress: 0.5 })
 
         const blob = await new Promise<Blob>((resolve, reject) => {
@@ -117,10 +141,12 @@ export function OcrTool() {
 
         const result = await res.json()
 
-        setText(result.text.trim())
-        setConfidence(result.confidence)
+        const extracted = typeof result.text === "string" ? result.text.trim() : ""
+        setText(extracted)
+        // Gemini doesn't report a real confidence score, so don't show one.
+        setConfidence(null)
         setPhase("done")
-        if (!result.text.trim()) toast.info("No text found in this image.")
+        if (!extracted) toast.info("No text found in this image.")
       } catch (e) {
         console.error(e)
         setPhase("error")
@@ -139,7 +165,7 @@ export function OcrTool() {
     void loadImage(dataUrl).then((img) => {
       const canvas = toCanvas(img, img.naturalWidth, img.naturalHeight)
       setSource(makeSource(canvas, "Camera capture from Scan"))
-      void run(canvas, { langs: ["eng"], pre: { grayscale: false, contrast: false } })
+      void run(canvas, { langs: ["eng"], pre: { grayscale: false, contrast: false }, engine: "device" })
     })
   }, [run])
 
@@ -148,6 +174,7 @@ export function OcrTool() {
     return () => {
       if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel()
       void pdfRef.current?.destroy()
+      void ocrEngineRef.current?.terminate()
     }
   }, [])
 
@@ -266,7 +293,7 @@ export function OcrTool() {
           <section className="rounded-2xl border bg-card p-3 sm:p-4" aria-label="Selected image">
             <div className="mb-2 flex items-center gap-2">
               <p className="min-w-0 flex-1 truncate text-sm font-medium">{source.label}</p>
-              <Button size="sm" variant="ghost" onClick={clearSource} disabled={running}>
+              <Button variant="ghost" onClick={clearSource} disabled={running}>
                 <X aria-hidden /> Change
               </Button>
             </div>
@@ -313,7 +340,7 @@ export function OcrTool() {
           </section>
         ) : (
           <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
-            <TabsList className="w-full sm:w-fit">
+            <TabsList className="w-full sm:w-fit group-data-horizontal/tabs:h-12">
               <TabsTrigger value="upload" className="px-4">
                 <ImageUp aria-hidden /> Image or PDF
               </TabsTrigger>
@@ -390,10 +417,15 @@ export function OcrTool() {
             </div>
             <Switch id="ocr-contrast" checked={pre.contrast} onCheckedChange={(c) => setPre((p) => ({ ...p, contrast: c }))} />
           </div>
+          {ai?.configured ? (
+            <Segmented label="Text reader" value={engine} onChange={setEngineChoice} options={ENGINE_OPTIONS} disabled={running} />
+          ) : null}
           <p className="text-xs text-muted-foreground">
-            Image is processed by AI. Please ensure you have internet access.
+            {engine === "ai"
+              ? "Your image is sent to Google Gemini to read the text. Choose On-device to keep it in your browser."
+              : "Runs in your browser. The first run downloads the OCR engine and language data, so it needs a connection once."}
           </p>
-          <Button size="lg" className="w-full" disabled={!source || running || !!loadingInput} onClick={() => source && void run(source.canvas, { langs, pre })}>
+          <Button size="lg" className="w-full" disabled={!source || running || !!loadingInput} onClick={() => source && void run(source.canvas, { langs, pre, engine })}>
             {running ? <Loader2 className="animate-spin" aria-hidden /> : phase === "done" ? <RotateCcw aria-hidden /> : <ScanText aria-hidden />}
             {running ? "Reading…" : phase === "done" ? "Run again" : "Extract text"}
           </Button>
@@ -412,7 +444,7 @@ export function OcrTool() {
                 <ProgressLabel>{progress.status || "Working…"}</ProgressLabel>
                 <ProgressValue>{() => `${pct}%`}</ProgressValue>
               </Progress>
-              <p className="text-xs text-muted-foreground">Extracting text using Gemini Vision API...</p>
+              <p className="text-xs text-muted-foreground">{engine === "ai" ? "Reading text with Google Gemini…" : "Reading text in your browser…"}</p>
             </div>
           ) : null}
           {phase === "error" && ocrError ? <Notice tone="danger" title="Couldn't read text">{ocrError}</Notice> : null}

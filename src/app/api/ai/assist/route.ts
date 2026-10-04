@@ -10,7 +10,7 @@ const bodySchema = z.object({
 })
 
 /** Jobs that benefit from more varied, creative output. */
-const CREATIVE = new Set<AssistKind>(["plan-day", "routine", "write", "goal-plan", "prompt-run", "english-quiz", "fun-quiz", "logic-puzzle", "decision-advice", "health-insights"])
+const CREATIVE = new Set<AssistKind>(["plan-day", "routine", "write", "goal-plan", "prompt-run", "english-quiz", "fun-quiz", "logic-puzzle", "decision-advice", "health-insights", "health-plan"])
 
 const DATE_RULES =
   "Resolve relative dates and times (today, tomorrow, next Friday, tonight, in 2 hours) against the user's current local date-time given below. " +
@@ -77,6 +77,21 @@ const INSTRUCTIONS: Record<AssistKind, string> = {
     "Safety rules: never diagnose, never prescribe medicines or supplements doses, no crash diets, never recommend below ~1200 kcal/day, be body-positive and non-judgemental. " +
     "Fill seeDoctor ONLY if something in the data warrants professional advice: BMI under 17 or 35+, sleep consistently under 5 h, rapid weight change, or ANY pain, symptom or health condition mentioned in notes (always add one gentle line for those, " +
     "e.g. persistent back pain → see a doctor or physiotherapist); otherwise leave it empty. If data is sparse, say so and give starter recommendations.",
+  "health-plan":
+    "You are a supportive, evidence-based health and fitness coach (not a doctor). From the user's profile, local estimates (calorie target, protein/carbs/fat grams, water, sleep, steps), " +
+    "current daily goals, the last 7 days of logs, weight trend and optional preferences, build ONE practical personal plan for their goal (lose weight, gain weight/muscle, maintain, build fitness, more energy or better sleep): " +
+    "a 2–4 sentence summary of where they are and what the plan does; up to 3 focus points; 4–6 meals for one typical day (time like '8:00 AM', a short name, the foods with portions, approx kcal) " +
+    "whose kcal add up to within ~10% of the calorie target, matching their diet type (vegetarian, vegan, Jain, eggetarian, non-vegetarian) and preferences, using affordable everyday foods (common Indian foods unless preferences say otherwise) and hitting the protein target; " +
+    "up to 6 foods to eat more of and up to 6 to limit; a 7-day workout week Mon→Sun suitable for their activity level, age and notes — each day a focus (e.g. 'Brisk walk + core', 'Upper body strength', 'Rest & stretch'), " +
+    "rest true/false, minutes, and up to 6 exercises with sets×reps or minutes (bodyweight/home-friendly unless they're already very active), with 1–2 rest or light days; " +
+    "a daily routine of 6–12 time blocks (24-hour HH:mm, title, duration minutes) from their wake time to bed time covering meals, water, workout, work/study, movement breaks, wind-down and sleep; " +
+    "up to 5 short practical tips; suggested daily goals (water glasses, steps, exercise minutes, sleep hours) that move gradually toward healthy targets. " +
+    "Safety: never diagnose or prescribe medicines or supplement doses, no crash diets, never below ~1200 kcal/day, weight loss ≤ 0.5–0.75 kg/week, weight gain ~0.25–0.5 kg/week, be body-positive. " +
+    "Fill seeDoctor ONLY when warranted: BMI under 17 or 35+, sleep consistently under 5 h, rapid weight change, age 60+ starting new exercise, pregnancy, or ANY pain, symptom or condition in notes; otherwise leave it empty.",
+  "health-ask":
+    "You are a supportive, evidence-based health, nutrition and fitness coach (not a doctor). Answer the user's one question using their profile for context: a clear, practical answer (≤ 150 words) " +
+    "and up to 5 short action points. Never diagnose, never prescribe medicines or supplement doses, no crash diets. If the question describes pain, a symptom, a medical condition, pregnancy or medication, " +
+    "give general guidance and set seeDoctor to one gentle line recommending a doctor; otherwise leave seeDoctor out. If the question isn't about health, fitness, food, sleep or wellbeing, say briefly that you can only help with those.",
   "prompt-grade":
     "You are an expert prompt-engineering coach. Grade the user's prompt for the given scenario on these criteria (0–10 each): Clarity, Context, Specificity & constraints, " +
     "Output format, Examples or role (when useful). Give an overall score 0–100, specific feedback per criterion, strengths, concrete improvements, " +
@@ -113,7 +128,7 @@ const INSTRUCTIONS: Record<AssistKind, string> = {
 }
 
 /** Jobs whose JSON is long (several questions, possibly bilingual). */
-const MAX_OUTPUT_TOKENS: Partial<Record<AssistKind, number>> = { "fun-quiz": 8192 }
+const MAX_OUTPUT_TOKENS: Partial<Record<AssistKind, number>> = { "fun-quiz": 8192, "health-plan": 8192 }
 
 /** Structured AI help for the My Life tools (parse, capture, subtasks, routine, extract, plan). */
 export async function POST(request: Request) {

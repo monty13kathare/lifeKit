@@ -188,7 +188,7 @@ function ExpressionCalculator() {
             enterKeyHint="done"
             aria-invalid={committedError && errorMessage ? true : undefined}
             aria-describedby="calc-result"
-            className="mt-1 w-full bg-transparent text-right font-mono text-xl break-all outline-none placeholder:text-muted-foreground/60 sm:text-2xl"
+            className="mt-1 h-10 w-full bg-transparent text-right font-mono text-xl outline-none placeholder:text-muted-foreground/60 sm:text-2xl"
           />
           <div id="calc-result" aria-live="polite" className="mt-2 min-h-12 text-right">
             {display ? (
@@ -226,7 +226,7 @@ function ExpressionCalculator() {
                 key={ex}
                 type="button"
                 onClick={() => update(ex, ex.length)}
-                className="min-h-9 rounded-full border bg-surface px-3 text-sm transition-colors hover:bg-muted"
+                className="min-h-10 rounded-full border bg-surface px-3 text-sm transition-colors hover:bg-muted"
               >
                 {ex}
               </button>

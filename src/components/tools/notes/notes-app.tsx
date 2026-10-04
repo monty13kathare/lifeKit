@@ -267,7 +267,12 @@ export function NotesApp() {
 
   const renderItem = (n: Note) => {
     const selected = n.id === activeId
-    const preview = n.title.trim() ? n.content.trim() : n.content.trim().split("\n").slice(1).join(" ")
+    // Show checklist markup ("- [ ] milk") as boxes in the list preview.
+    const body = n.content
+      .trim()
+      .replace(/^\s*[-*] \[ \] ?/gm, "☐ ")
+      .replace(/^\s*[-*] \[[xX]\] ?/gm, "☑ ")
+    const preview = n.title.trim() ? body : body.split("\n").slice(1).join(" ")
     return (
       <li key={n.id}>
         <div

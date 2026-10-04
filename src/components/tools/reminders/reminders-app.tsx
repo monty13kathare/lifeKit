@@ -463,16 +463,16 @@ function ReminderRow({
         {state !== "done" && (state !== "upcoming" || r.repeat === "none") ? (
           <div className="mt-2.5 flex flex-wrap gap-2">
             {state === "due" || state === "missed" || r.repeat === "none" ? (
-              <Button size="sm" variant={state === "due" ? "default" : "outline"} onClick={() => onDone(r)}>
+              <Button size="sm" variant={state === "due" ? "default" : "outline"} className="h-10 sm:h-8" onClick={() => onDone(r)}>
                 <Check aria-hidden /> {r.repeat === "none" ? "Mark done" : "Done"}
               </Button>
             ) : null}
             {canSnooze ? (
               <>
-                <Button size="sm" variant="outline" onClick={() => onSnooze(r, 10)}>
+                <Button size="sm" variant="outline" className="h-10 sm:h-8" onClick={() => onSnooze(r, 10)}>
                   +10 min
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => onSnooze(r, 60)}>
+                <Button size="sm" variant="outline" className="h-10 sm:h-8" onClick={() => onSnooze(r, 60)}>
                   +1 hour
                 </Button>
               </>

@@ -103,9 +103,11 @@ export function PdfEditor() {
       })
     } catch (err) {
       if (id !== loadId.current) return
-      console.error(err)
+      const failure = classifyError(err)
+      // Password-protected and invalid files are expected user errors, not bugs.
+      if (failure.kind !== "password" && failure.kind !== "invalid") console.error(err)
       releasePdf()
-      setPhase(classifyError(err))
+      setPhase(failure)
     }
   }
 
@@ -144,7 +146,7 @@ export function PdfEditor() {
           icon={phase.kind === "password" ? FileLock : FileX}
           title={phase.kind === "password" ? "Password-protected PDF" : phase.kind === "invalid" ? "Unsupported or damaged file" : "Couldn't open this PDF"}
           action={
-            <Button size="sm" variant="outline" onClick={reset}>
+            <Button variant="outline" onClick={reset}>
               Try another file
             </Button>
           }

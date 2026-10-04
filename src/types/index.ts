@@ -276,6 +276,29 @@ export interface HealthProfile {
   updatedAt?: ISODateTime
 }
 
+/** The latest AI health plan (diet, workout week, routine) for the user's goal. */
+export interface HealthPlan {
+  generatedAt: ISODateTime
+  language: AiLanguage
+  goal: HealthGoal
+  /** Calorie target and weight the plan was made for, to flag a stale plan. */
+  calorieTarget?: number
+  weightKg?: number
+  /** Output of the `health-plan` AI job. */
+  data: {
+    summary: string
+    focus: string[]
+    meals: { time: string; name: string; items: string; kcal: number }[]
+    eatMore: string[]
+    limit: string[]
+    workouts: { day: "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun"; focus: string; rest: boolean; minutes: number; exercises: string[] }[]
+    routine: { time: TimeString; title: string; durationMinutes: number }[]
+    tips: string[]
+    suggestedGoals: { waterGlasses?: number; steps?: number; exerciseMinutes?: number; sleepHours?: number }
+    seeDoctor: string[]
+  }
+}
+
 /** A saved AI health check (latest few kept). */
 export interface HealthInsight {
   id: string

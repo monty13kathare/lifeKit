@@ -212,3 +212,48 @@ nextjs-portal,
   display: none !important;
 }
 
+
+/* ------------------------------------------------ Learn with Fun motion */
+@keyframes lk-confetti {
+  0% { transform: translate3d(0, -10vh, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate3d(var(--drift, 0px), 105vh, 0) rotate(var(--spin, 720deg)); opacity: 0.9; }
+}
+@keyframes lk-pop {
+  0% { transform: scale(0) rotate(-25deg); opacity: 0; }
+  60% { transform: scale(1.25) rotate(8deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes lk-drop {
+  0% { transform: translateY(-60px) scale(0.6); opacity: 0; }
+  55% { transform: translateY(6px) scale(1.08); opacity: 1; }
+  75% { transform: translateY(-4px) scale(0.98); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes lk-rise {
+  0% { transform: translateY(14px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes lk-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+@keyframes lk-glow {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.08); }
+}
+@utility animate-lk-pop {
+  animation: lk-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@utility animate-lk-drop {
+  animation: lk-drop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@utility animate-lk-rise {
+  animation: lk-rise 0.45s ease-out both;
+}
+@utility animate-lk-shake {
+  animation: lk-shake 0.4s ease-in-out both;
+}
+@utility animate-lk-glow {
+  animation: lk-glow 2.4s ease-in-out infinite;
+}

@@ -248,7 +248,7 @@ export function ImageResizerTool() {
             Original: {source.img.width}×{source.img.height} px · {formatBytes(source.file.size)} · {shortFormatLabel(source.mime)}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={reset}>
+        <Button variant="outline" onClick={reset}>
           <RefreshCw aria-hidden /> Change image
         </Button>
       </div>
@@ -346,7 +346,7 @@ export function ImageResizerTool() {
         ) : null}
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Quick scale">
           {[0.25, 0.5, 0.75].map((f) => (
-            <Button key={f} type="button" variant="outline" size="sm" className="h-9 px-3" disabled={!source} onClick={() => scaleBy(f)}>
+            <Button key={f} type="button" variant="outline" className="px-3" disabled={!source} onClick={() => scaleBy(f)}>
               {f * 100}%
             </Button>
           ))}

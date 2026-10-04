@@ -20,7 +20,7 @@ interface SwatchProps {
 export function ColorSwatches({ label, value, colors, onChange, compact }: SwatchProps) {
   const known = colors.some((c) => c.value.toLowerCase() === value.toLowerCase())
   return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap items-center gap-1">
+    <div role="radiogroup" aria-label={label} className={cn("flex items-center gap-1", compact ? "flex-nowrap" : "flex-wrap")}>
       {colors.map((c) => {
         const active = c.value.toLowerCase() === value.toLowerCase()
         return (
@@ -33,7 +33,7 @@ export function ColorSwatches({ label, value, colors, onChange, compact }: Swatc
             onClick={() => onChange(c.value)}
             className={cn(
               "flex shrink-0 items-center justify-center rounded-full border-2 outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-              compact ? "size-9" : "size-10",
+              "size-10",
               active ? "border-primary" : "border-transparent hover:border-border"
             )}
           >
@@ -44,7 +44,7 @@ export function ColorSwatches({ label, value, colors, onChange, compact }: Swatc
       <label
         className={cn(
           "relative flex shrink-0 cursor-pointer items-center justify-center rounded-full border-2 focus-within:ring-3 focus-within:ring-ring/50",
-          compact ? "size-9" : "size-10",
+          "size-10",
           !known ? "border-primary" : "border-transparent hover:border-border"
         )}
       >
@@ -189,6 +189,7 @@ export function ToolOptions({
   if (tool === "edit-text") {
     return (
       <div className={cn(compact ? "flex items-center gap-2 overflow-x-auto" : "space-y-3")}>
+        {compact && <p className="py-2 text-xs text-muted-foreground">Tap any text on the page to replace or erase it.</p>}
         {!compact && (
           <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground space-y-1.5">
             <p className="font-semibold text-foreground flex items-center gap-1.5">
@@ -226,7 +227,7 @@ export function ToolOptions({
           <span className={labelCls}>Colour</span>
           <ColorSwatches compact={compact} label="Pen colour" value={settings.penColor} colors={INK_COLORS} onChange={(penColor) => onSettings({ penColor })} />
         </div>
-        <div className={cn(row, compact && "min-w-32 flex-1")}>
+        <div className={cn(row, compact && "min-w-24 flex-1")}>
           {compact ? (
             <span className="sr-only">Thickness</span>
           ) : (

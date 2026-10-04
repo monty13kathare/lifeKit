@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { ChevronRight, FileScan, QrCode, ScanBarcode, ScanLine, ScanText, type LucideIcon } from "lucide-react"
+import { ChevronRight, FileScan, QrCode, ScanText, type LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { CameraScanner } from "@/components/tools/scanner/camera-scanner"
@@ -104,7 +104,7 @@ export function ScanEverything() {
 
         <nav aria-label="Other scan tools">
           <h2 className="mb-2 text-sm font-medium text-muted-foreground">More ways to scan</h2>
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-2">
             {QUICK_LINKS.map(({ href, label, description, icon: Icon }) => (
               <li key={href}>
                 <Link
@@ -118,7 +118,7 @@ export function ScanEverything() {
                     <span className="block truncate text-sm font-medium">{label}</span>
                     <span className="block truncate text-xs text-muted-foreground">{description}</span>
                   </span>
-                  <ChevronRight className="hidden size-4 shrink-0 text-muted-foreground sm:block" aria-hidden />
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground sm:hidden lg:block" aria-hidden />
                 </Link>
               </li>
             ))}

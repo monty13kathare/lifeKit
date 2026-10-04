@@ -98,10 +98,10 @@ export function PageList({ pages, activeId, canRetake, onMove, onCrop, onEnhance
             </p>
           </div>
           <div className="flex shrink-0 items-center">
-            <div className="flex flex-col">
+            <div className="flex">
               <Button
                 variant="ghost"
-                size="icon-sm"
+                size="icon"
                 aria-label={`Move page ${i + 1} up`}
                 disabled={i === 0}
                 onClick={() => onMove(i, i - 1)}
@@ -110,7 +110,7 @@ export function PageList({ pages, activeId, canRetake, onMove, onCrop, onEnhance
               </Button>
               <Button
                 variant="ghost"
-                size="icon-sm"
+                size="icon"
                 aria-label={`Move page ${i + 1} down`}
                 disabled={i === pages.length - 1}
                 onClick={() => onMove(i, i + 1)}

@@ -143,7 +143,7 @@ function BookmarkForm({ initial, categories, tagSuggestions, onSubmit }: Pick<Bo
         <Label htmlFor="bm-title">Title</Label>
         <Input
           id="bm-title"
-          placeholder={url ? hostnameOf(normalizeUrl(url)) : "Defaults to the website name"}
+          placeholder={url && !/\s/.test(url.trim()) ? hostnameOf(normalizeUrl(url)) : "Defaults to the website name"}
           value={title}
           maxLength={120}
           onChange={(e) => setTitle(e.target.value)}

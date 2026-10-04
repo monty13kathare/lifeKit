@@ -127,7 +127,7 @@ export const TOOLS: Tool[] = [
   { id: "notes", name: "Notes", description: "Quick notes, including text from OCR.", href: "/tools/notes", icon: NotebookPen, category: "productivity", section: "life", accent: A.violet },
 
   // My Life — personal
-  { id: "wellness", name: "Wellness", description: "Water, sleep, activity and habits.", href: "/tools/wellness", icon: HeartPulse, category: "personal", section: "life", accent: A.rose },
+  { id: "wellness", name: "Wellness", description: "Your body numbers, daily tracking and an AI diet, workout & routine plan.", href: "/tools/wellness", icon: HeartPulse, category: "personal", section: "life", accent: A.rose },
   { id: "bookmarks", name: "Bookmarks", description: "Save useful links for later.", href: "/tools/bookmarks", icon: Bookmark, category: "personal", section: "life", accent: A.teal },
 
 

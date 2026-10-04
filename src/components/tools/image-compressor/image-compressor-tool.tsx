@@ -122,6 +122,7 @@ export function ImageCompressorTool() {
     setBusy(true)
     const key = settingsKey
     let failures = 0
+    let overTarget = 0
     let imageCompression: typeof import("browser-image-compression").default
     try {
       imageCompression = (await import("browser-image-compression")).default
@@ -150,6 +151,7 @@ export function ImageCompressorTool() {
           onProgress: (p) => patch(item.id, { progress: p }),
         })
         const blob = new Blob([out], { type: outType })
+        if (targetMB && blob.size > targetMB * 1024 * 1024) overTarget++
         const prevUrl = itemsRef.current.find((i) => i.id === item.id)?.result?.url
         if (!itemsRef.current.some((i) => i.id === item.id)) continue
         const url = urls.create(blob)
@@ -162,6 +164,10 @@ export function ImageCompressorTool() {
     }
     setBusy(false)
     if (failures) toast.error(`${failures} image${failures === 1 ? "" : "s"} couldn't be compressed`)
+    else if (overTarget)
+      toast.warning(`${overTarget} image${overTarget === 1 ? "" : "s"} couldn't reach the target size`, {
+        description: "They were compressed as far as possible. Try a larger target or smaller dimensions.",
+      })
     else toast.success(queue.length === 1 ? "Image compressed" : `${queue.length} images compressed`)
   }
 
@@ -216,7 +222,7 @@ export function ImageCompressorTool() {
             <h2 id="cmp-heading" className="text-base font-semibold">
               {items.length} image{items.length === 1 ? "" : "s"}
             </h2>
-            <Button variant="ghost" size="sm" onClick={clearAll} disabled={busy}>
+            <Button variant="ghost" onClick={clearAll} disabled={busy}>
               <Trash2 aria-hidden /> Clear all
             </Button>
           </div>

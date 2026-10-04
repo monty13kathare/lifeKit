@@ -4,10 +4,8 @@ import Link from "next/link"
 import { Logo } from "@/components/common/logo"
 import { ProfileMenu } from "./profile-menu"
 import { ThemeToggle } from "./theme-toggle"
-import { usePathname } from "next/navigation"
 
 export function Header() {
-  const pathname = usePathname()
 
 
   return (

@@ -9,7 +9,6 @@ import {
   EyeOff,
   Globe,
   KeyRound,
-  Link2,
   Loader2,
   Lock,
   QrCode,
@@ -373,7 +372,6 @@ export function CreateShare() {
 
 function ShareResultView({ result, onReset }: { result: ShareResult; onReset: () => void }) {
   const pkg = result.package
-  const canShareFiles = services.file.canShareFiles([pkg])
   const expires = new Date(result.expiresAt)
   const [showQr, setShowQr] = useState(false)
   const qrCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -510,7 +508,7 @@ function ShareResultView({ result, onReset }: { result: ShareResult; onReset: ()
 
       {/* Offline Package File Card */}
       <section className="space-y-3 rounded-2xl border bg-card p-4 shadow-soft sm:p-5">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-muted-foreground">
             <Lock className="size-5" aria-hidden />
           </div>
@@ -520,7 +518,7 @@ function ShareResultView({ result, onReset }: { result: ShareResult; onReset: ()
               {formatBytes(pkg.size)} · Standalone offline encrypted container
             </p>
           </div>
-          <Button size="sm" variant="outline" onClick={() => downloadBlob(pkg, pkg.name)}>
+          <Button variant="outline" className="w-full sm:w-auto" onClick={() => downloadBlob(pkg, pkg.name)}>
             <Download aria-hidden /> Download .lifekit
           </Button>
         </div>

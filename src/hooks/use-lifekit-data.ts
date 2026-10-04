@@ -17,6 +17,7 @@ import {
   DEFAULT_HEALTH_PROFILE,
   healthInsightsStore,
   healthProfileStore,
+  healthPlanStore,
   DEFAULT_FUN_STATS,
   funQuizSetsStore,
   funStatsStore,
@@ -70,6 +71,7 @@ export function useWellness() {
   const storedProfile = useStore(healthProfileStore)
   const profile = useMemo(() => ({ ...DEFAULT_HEALTH_PROFILE, ...storedProfile }), [storedProfile])
   const insights = useStore(healthInsightsStore)
+  const plan = useStore(healthPlanStore)
   return {
     days,
     goals,
@@ -82,6 +84,8 @@ export function useWellness() {
     insights,
     addInsight: healthInsightsStore.add,
     removeInsight: healthInsightsStore.remove,
+    plan,
+    setPlan: healthPlanStore.set,
   }
 }
 

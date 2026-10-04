@@ -1,22 +1,61 @@
 /*
- * LifeKit service worker — installability and basic static-asset caching only.
- * There is intentionally no offline mode: pages and data requests always go
- * to the network. Only immutable, content-hashed build assets and icons are
- * cached to speed up repeat visits.
+ * LifeKit service worker — installability and offline support.
+ *
+ * - Pages (navigations): network first, so people always get the latest
+ *   version online; the last copy seen is served when offline, and /offline
+ *   when a page was never visited. LifeKit's data lives in the browser, so the
+ *   offline copy works with the user's own tasks, notes and so on.
+ * - Content-hashed build assets and icons: cache first (they never change).
+ * - API routes (/api/*, e.g. Gemini) and cross-origin requests always go to
+ *   the network and are never cached.
  */
-const CACHE = "lifekit-static-v1"
-const PRECACHE = ["/icons/icon-192.png", "/icons/icon-512.png", "/icons/icon.svg"]
+const VERSION = "v2"
+const STATIC_CACHE = `lifekit-static-${VERSION}`
+const PAGE_CACHE = `lifekit-pages-${VERSION}`
+const OFFLINE_URL = "/offline"
+/** Cached at install so the main tabs open offline even before a visit. */
+const PRECACHE_PAGES = [OFFLINE_URL, "/", "/tools", "/my-life", "/learn"]
+const PRECACHE_STATIC = ["/icons/icon-192.png", "/icons/icon-512.png", "/icons/icon.svg", "/manifest.webmanifest"]
+const MAX_PAGES = 60
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()))
+  event.waitUntil(
+    (async () => {
+      // Best effort: a failed pre-cache must not block installation.
+      try {
+        const statics = await caches.open(STATIC_CACHE)
+        await statics.addAll(PRECACHE_STATIC)
+      } catch {}
+      try {
+        const pages = await caches.open(PAGE_CACHE)
+        const assets = new Set()
+        await Promise.all(
+          PRECACHE_PAGES.map(async (url) => {
+            const res = await fetch(url, { cache: "no-store" }).catch(() => null)
+            if (!res || !res.ok) return
+            // Also cache the page's own scripts and styles so it hydrates offline.
+            const html = await res.clone().text()
+            for (const m of html.matchAll(/\/_next\/static\/[^"'\s)\\]+/g)) assets.add(m[0])
+            await pages.put(url, res)
+          })
+        )
+        const statics = await caches.open(STATIC_CACHE)
+        await Promise.all([...assets].map((a) => statics.add(a).catch(() => undefined)))
+      } catch {}
+      await self.skipWaiting()
+    })()
+  )
 })
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
+    (async () => {
+      const keep = new Set([STATIC_CACHE, PAGE_CACHE])
+      const keys = await caches.keys()
+      await Promise.all(keys.filter((k) => k.startsWith("lifekit-") && !keep.has(k)).map((k) => caches.delete(k)))
+      if (self.registration.navigationPreload) await self.registration.navigationPreload.enable().catch(() => {})
+      await self.clients.claim()
+    })()
   )
 })
 
@@ -25,24 +64,66 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
+  if (url.pathname.startsWith("/api/")) return
 
-  const isStatic = url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/")
-  if (!isStatic) return // Network as normal for everything else.
+  if (request.mode === "navigate") {
+    event.respondWith(networkFirstPage(event))
+    return
+  }
 
-  event.respondWith(
-    caches.match(request).then(
-      (cached) =>
-        cached ||
-        fetch(request).then((res) => {
-          if (res.ok) {
-            const copy = res.clone()
-            caches.open(CACHE).then((c) => c.put(request, copy))
-          }
-          return res
-        })
-    )
-  )
+  const isStatic =
+    url.pathname.startsWith("/_next/static/") ||
+    url.pathname.startsWith("/icons/") ||
+    url.pathname.startsWith("/vendor/") ||
+    url.pathname === "/manifest.webmanifest" ||
+    /\.(?:png|svg|ico|woff2?|webp)$/.test(url.pathname)
+  if (isStatic) event.respondWith(cacheFirst(request))
 })
+
+async function networkFirstPage(event) {
+  const { request } = event
+  const url = new URL(request.url)
+  const key = url.pathname // ignore query strings and hashes for page copies
+  try {
+    const res = (await event.preloadResponse) || (await fetch(request))
+    if (res.ok && res.type === "basic") {
+      const copy = res.clone()
+      event.waitUntil(
+        caches.open(PAGE_CACHE).then(async (cache) => {
+          await cache.put(key, copy)
+          await trimCache(cache, MAX_PAGES)
+        })
+      )
+    }
+    return res
+  } catch {
+    const cache = await caches.open(PAGE_CACHE)
+    return (
+      (await cache.match(key)) ||
+      (await cache.match(OFFLINE_URL)) ||
+      new Response("<h1>You're offline</h1><p>Reconnect to open this page.</p>", {
+        status: 503,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      })
+    )
+  }
+}
+
+async function cacheFirst(request) {
+  const cache = await caches.open(STATIC_CACHE)
+  const cached = await cache.match(request)
+  if (cached) return cached
+  const res = await fetch(request)
+  if (res.ok) cache.put(request, res.clone()).catch(() => {})
+  return res
+}
+
+async function trimCache(cache, max) {
+  const keys = await cache.keys()
+  const protectedUrls = new Set(PRECACHE_PAGES.map((p) => new URL(p, self.location.origin).href))
+  const removable = keys.filter((k) => !protectedUrls.has(k.url))
+  for (let i = 0; i < removable.length - (max - protectedUrls.size); i++) await cache.delete(removable[i])
+}
 
 // Focus the app when a reminder notification is clicked.
 self.addEventListener("notificationclick", (event) => {

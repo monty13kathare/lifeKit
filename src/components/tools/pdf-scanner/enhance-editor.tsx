@@ -153,7 +153,6 @@ export function EnhanceEditor({ initial, preview, saving, onBack, onSave, backLa
         <div className="sm:col-span-2">
           <Button
             variant="ghost"
-            size="sm"
             onClick={() => setS({ ...DEFAULT_ENHANCE, filter: s.filter, rotation: s.rotation })}
           >
             <Undo2 aria-hidden /> Reset adjustments

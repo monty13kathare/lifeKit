@@ -15,6 +15,8 @@ interface ToolPageProps {
   /** Content width: narrow for forms/calculators, wide for workspaces/editors. */
   width?: "narrow" | "default" | "wide" | "full"
   backHref?: string
+  /** Hide the mobile back arrow (for pages that are a bottom-nav tab). */
+  hideBack?: boolean
   className?: string
   children: React.ReactNode
 }
@@ -37,6 +39,7 @@ export function ToolPage({
   actions,
   width = "default",
   backHref,
+  hideBack,
   className,
   children,
 }: ToolPageProps) {
@@ -46,13 +49,15 @@ export function ToolPage({
   return (
     <div className={cn("mx-auto w-full", widths[width], className)}>
       <header className="mb-5 flex items-start gap-3 sm:mb-6 sm:gap-4">
-        <Link
-          href={back}
-          aria-label="Back"
-          className="-ml-2 mt-1.5 inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
-        >
-          <ChevronLeft className="size-5" />
-        </Link>
+        {!hideBack && (
+          <Link
+            href={back}
+            aria-label="Back"
+            className="-ml-2 mt-1.5 inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+          >
+            <ChevronLeft className="size-5" />
+          </Link>
+        )}
         <div className={cn("hidden size-12 shrink-0 items-center justify-center rounded-2xl lg:flex", tool.accent)}>
           <Icon className="size-6" aria-hidden />
         </div>

@@ -183,7 +183,7 @@ function RoutineForm({ item, defaults, onSubmit, allItems = [] }: RoutineFormShe
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {DAY_PRESETS.map((p) => (
-            <Button key={p.label} type="button" variant="outline" size="sm" onClick={() => setValue("repeatDays", p.days, { shouldValidate: true })}>
+            <Button key={p.label} type="button" variant="outline" size="sm" className="h-9" onClick={() => setValue("repeatDays", p.days, { shouldValidate: true })}>
               {p.label}
             </Button>
           ))}

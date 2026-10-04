@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function OcrPage() {
   return (
-    <ToolPage toolId="ocr" width="wide" privacy="Your image is processed in your browser">
+    <ToolPage toolId="ocr" width="wide" privacy="On-device mode keeps your image in your browser">
       <OcrTool />
     </ToolPage>
   )

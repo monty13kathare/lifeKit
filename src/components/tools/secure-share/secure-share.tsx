@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { FileLock2, LockOpen } from "lucide-react"
 import { Notice, UnsupportedNotice } from "@/components/common/notice"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -14,15 +14,11 @@ type Tab = "create" | "open"
 
 export function SecureShare() {
   const hydrated = useHydrated()
-  const [tab, setTab] = useState<Tab>("create")
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const params = new URLSearchParams(window.location.search)
-    if (params.get("pkg")) {
-      setTab("open")
-    }
-  }, [])
+  // A shared link (?pkg=…) opens straight on the "Open" tab. The tabs only render after
+  // hydration (skeleton below), so reading the URL in the initializer can't cause a mismatch.
+  const [tab, setTab] = useState<Tab>(() =>
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("pkg") ? "open" : "create"
+  )
 
   if (!hydrated) return <Skeleton className="h-96 rounded-2xl" />
 
