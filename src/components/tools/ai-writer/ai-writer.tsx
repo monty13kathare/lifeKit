@@ -212,7 +212,7 @@ export function AiWriter() {
             placeholder={modeInfo.placeholder}
             aria-describedby="writer-count"
             aria-invalid={tooLong || undefined}
-            className="min-h-44 resize-y text-base sm:text-sm"
+            className="min-h-44 max-h-[50dvh] overflow-y-auto resize-y text-base sm:text-sm"
           />
           <p id="writer-count" className={cn("flex justify-between gap-2 text-xs tabular-nums", tooLong ? "text-destructive" : "text-muted-foreground")}>
             <span>{tooLong ? `Too long — remove ${(text.length - WRITER_TEXT_LIMIT).toLocaleString()} characters.` : "Ctrl + Enter to generate"}</span>
@@ -233,7 +233,7 @@ export function AiWriter() {
               maxLength={WRITER_INSTRUCTIONS_LIMIT}
               onChange={(e) => setInstructions(e.target.value)}
               placeholder={mode === "reply" ? "e.g. Accept the invitation but ask to move it to 4 pm." : "e.g. Mention my employee ID 4521. Keep it under 120 words."}
-              className="min-h-20 resize-y text-base sm:text-sm"
+              className="min-h-20 max-h-[50dvh] overflow-y-auto resize-y text-base sm:text-sm"
             />
           </div>
         ) : null}

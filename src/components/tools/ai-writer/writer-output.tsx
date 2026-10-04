@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { ArrowUpLeft, History, Mail, NotebookPen, PenLine, RefreshCw } from "lucide-react"
+import { ArrowUpLeft, FileText, History, Mail, NotebookPen, PenLine, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { CopyButton } from "@/components/common/copy-button"
 import { EmptyState } from "@/components/common/empty-state"
@@ -149,7 +149,7 @@ export function WriterOutput({
               value={body}
               onChange={(e) => onEditBody(e.target.value)}
               dir="auto"
-              className="min-h-64 resize-y bg-surface text-base leading-relaxed sm:text-sm"
+              className="min-h-64 max-h-[50dvh] overflow-y-auto resize-y bg-surface text-base leading-relaxed sm:text-sm"
             />
             <p className="text-right text-xs text-muted-foreground tabular-nums">
               {body.trim() ? body.trim().split(/\s+/).length.toLocaleString() : 0} words
@@ -167,8 +167,18 @@ export function WriterOutput({
             <Button variant="outline" disabled={!body.trim()} onClick={save}>
               <NotebookPen aria-hidden /> Save to notes
             </Button>
-            <Button variant="outline" disabled={!body.trim()} onClick={openEmail} className="col-span-2 sm:col-span-1">
+            <Button variant="outline" disabled={!body.trim()} onClick={openEmail}>
               <Mail aria-hidden /> Open in email
+            </Button>
+            <Button variant="outline" disabled={!body.trim()} onClick={() => {
+                try {
+                  sessionStorage.setItem("lifekit:text-to-pdf-handoff", full)
+                  router.push("/tools/text-to-pdf")
+                } catch {
+                  toast.error("Failed to export.")
+                }
+            }}>
+              <FileText aria-hidden /> Export PDF
             </Button>
           </div>
         </div>

@@ -185,7 +185,7 @@ export function Summarizer() {
             placeholder="Paste an article, email thread, meeting notes, report…"
             aria-describedby="summary-stats"
             aria-invalid={tooLong || undefined}
-            className="min-h-56 resize-y text-base sm:text-sm"
+            className="min-h-56 max-h-[50dvh] overflow-y-auto resize-y text-base sm:text-sm"
           />
           <p id="summary-stats" className={cn("flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs tabular-nums", tooLong ? "text-destructive" : "text-muted-foreground")}>
             <span>

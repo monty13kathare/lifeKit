@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function TextToPdfPage() {
   return (
-    <ToolPage toolId="text-to-pdf" width="wide" privacy="Your document is generated securely in your browser">
+    <ToolPage toolId="text-to-pdf" width="wide">
       <TextToPdfTool />
     </ToolPage>
   )

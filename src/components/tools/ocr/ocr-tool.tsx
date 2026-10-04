@@ -445,7 +445,7 @@ export function OcrTool() {
               onChange={(e) => setText(e.target.value)}
               rows={12}
               placeholder="No text was found. Try enabling grayscale and contrast, or a sharper image."
-              className={cn("min-h-60 font-mono text-sm leading-relaxed", !editing && "bg-surface")}
+              className={cn("min-h-60 max-h-[50dvh] overflow-y-auto font-mono text-sm leading-relaxed", !editing && "bg-surface")}
             />
             {confidence != null && confidence < 60 && text ? (
               <p className="mt-2 text-xs text-warning-foreground dark:text-warning">Low confidence — check the text, or try the pre-processing options and run again.</p>
@@ -476,6 +476,16 @@ export function OcrTool() {
               ) : null}
               <Button variant="outline" disabled={!text.trim()} onClick={() => downloadText(text, "extracted-text.txt")}>
                 <Download aria-hidden /> TXT
+              </Button>
+              <Button variant="outline" disabled={!text.trim()} onClick={() => {
+                  try {
+                    sessionStorage.setItem("lifekit:text-to-pdf-handoff", text)
+                    router.push("/tools/text-to-pdf")
+                  } catch {
+                    toast.error("Failed to export.")
+                  }
+              }}>
+                <FileText aria-hidden /> PDF
               </Button>
             </div>
           </div>

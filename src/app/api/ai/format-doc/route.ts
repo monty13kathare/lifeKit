@@ -21,9 +21,10 @@ export async function POST(request: Request) {
 Your task is to convert this text into clean, professional, and beautifully structured HTML.
 Use appropriate HTML tags like <h1>, <h2>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <blockquote>.
 Do NOT include <html>, <head>, or <body> tags. Just return the inner HTML content.
-For styling, you MUST use inline CSS (e.g. style="color: #333; margin-bottom: 12px;"). Do NOT use Tailwind classes or external CSS, because this HTML will be exported directly to a PDF using html2pdf.
+For styling, you MUST use inline CSS (e.g. style="color: #333;"). Do NOT use Tailwind classes or external CSS.
 Make it look like a professional report or document. Add a title if one isn't obvious.
 Use a color theme based on: ${themeColors}. Use this theme color for headings, strong tags, bullet points, or subtle backgrounds for blockquotes.
+CRITICAL: Do NOT wrap the content in any container <div> with max-width, margins, or padding. The page margins are handled by the PDF engine, so your content must expand to 100% width naturally.
 Do not wrap your response in markdown code blocks. Just output raw HTML.`
 
     const raw = await generate({
