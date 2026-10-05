@@ -132,7 +132,7 @@ export const TOOLS: Tool[] = [
 
 
   // Learn Skills
-  { id: "learn", name: "Learn with Fun", description: "Quiz games for logic, English, riddles, idioms and stories — in English & Hindi.", href: "/learn", icon: Gamepad2, category: "learn", section: "learn", accent: A.violet },
+  { id: "learn", name: "Learn with Fun", description: "Quiz games and AI lessons on any topic — in English & Hindi.", href: "/learn", icon: Gamepad2, category: "learn", section: "learn", accent: A.violet },
   { id: "learn-english", name: "English", description: "Vocabulary, grammar and writing practice.", href: "/learn/english", icon: BookA, category: "learn", section: "learn", accent: A.sky },
   { id: "learn-logic", name: "Logic & Reasoning", description: "Puzzles, patterns and mental maths.", href: "/learn/logic", icon: Puzzle, category: "learn", section: "learn", accent: A.amber },
 ]

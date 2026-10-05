@@ -41,7 +41,7 @@ type View =
   | { name: "play"; quiz: ActiveQuiz; mode: FunMode; round: number }
   | { name: "results"; quiz: ActiveQuiz; mode: FunMode; summary: GameSummary; levelUp: number | null; savedId?: string }
 
-export function LearnFunApp() {
+export function LearnFunApp({ tabs }: { tabs?: React.ReactNode } = {}) {
   const hydrated = useHydrated()
   const ai = useAiStatus()
   const aiEnabled = !!ai?.configured
@@ -234,6 +234,7 @@ export function LearnFunApp() {
 
   return (
     <ToolPage toolId="learn" hideBack>
+      {tabs}
       {view.name === "loading" ? (
         <LoadingCard lang={lang} onCancel={cancelLoading} />
       ) : !hydrated ? (

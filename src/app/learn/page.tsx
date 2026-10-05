@@ -1,11 +1,11 @@
 import type { Metadata } from "next"
-import { LearnFunApp } from "@/components/learn/fun/learn-fun-app"
+import { LearnPage } from "@/components/learn/learn-page"
 
 export const metadata: Metadata = {
   title: "Learn with Fun",
-  description: "Quiz games for logic, reasoning, English, riddles, idioms and stories — in English and Hindi, with AI-made questions on any topic.",
+  description: "Quiz games and AI lessons for reasoning, English, maths and any topic — explained simply with examples and stories, in English and Hindi.",
 }
 
-export default function LearnPage() {
-  return <LearnFunApp />
+export default function Page() {
+  return <LearnPage />
 }

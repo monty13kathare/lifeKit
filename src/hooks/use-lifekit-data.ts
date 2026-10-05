@@ -21,6 +21,7 @@ import {
   DEFAULT_FUN_STATS,
   funQuizSetsStore,
   funStatsStore,
+  learnLessonsStore,
 } from "@/lib/storage"
 import type { HealthProfile, Settings } from "@/types"
 
@@ -130,4 +131,9 @@ export function useLearnFun() {
   const stats = useMemo(() => ({ ...DEFAULT_FUN_STATS, ...stored }), [stored])
   const quizzes = useStore(funQuizSetsStore)
   return { stats, resetStats: funStatsStore.reset, quizzes, ...pickMutations(funQuizSetsStore) }
+}
+
+export function useLessons() {
+  const lessons = useStore(learnLessonsStore)
+  return { lessons, ...pickMutations(learnLessonsStore) }
 }

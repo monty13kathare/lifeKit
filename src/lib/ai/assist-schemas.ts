@@ -245,6 +245,41 @@ export const ASSIST_OUTPUT = {
       .min(1)
       .max(10),
   }),
+  /** Input JSON: { subject, topic, level, style: "examples"|"story"|"exam", language: "en"|"hi" } — a full lesson. */
+  "learn-lesson": z.object({
+    title: z.string().min(1).max(120),
+    intro: z.string().min(1).max(1200),
+    keyIdeas: z
+      .array(z.object({ heading: z.string().min(1).max(100), explanation: z.string().min(1).max(900), example: z.string().max(700) }))
+      .min(2)
+      .max(6),
+    story: z.object({ title: z.string().max(100), text: z.string().max(1800) }),
+    method: z.array(z.string().max(300)).max(8),
+    examples: z
+      .array(z.object({ question: z.string().min(1).max(600), steps: z.array(z.string().max(300)).max(8), answer: z.string().min(1).max(300) }))
+      .min(1)
+      .max(3),
+    tips: z.array(z.string().max(250)).max(5),
+    mistakes: z.array(z.string().max(250)).max(4),
+    practice: z
+      .array(
+        z.object({
+          question: z.string().min(1).max(500),
+          options: z.array(z.string().min(1).max(200)).length(4),
+          answerIndex: z.number().int().min(0).max(3),
+          explanation: z.string().max(500),
+        })
+      )
+      .min(2)
+      .max(4),
+    summary: z.array(z.string().max(250)).min(2).max(6),
+    nextTopics: z.array(z.string().max(80)).max(4),
+  }),
+  /** Input JSON: { subject, topic, lessonTitle, keyIdeas: string[], question, language } — a doubt about a lesson. */
+  "learn-ask": z.object({
+    answer: z.string().min(1).max(1500),
+    example: z.string().max(700).optional(),
+  }),
   /** Input JSON: { category, difficulty } */
   "logic-puzzle": z.object({
     title: z.string().max(120),

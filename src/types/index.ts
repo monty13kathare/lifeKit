@@ -376,3 +376,39 @@ export interface FunStats {
   lastPlayed?: DateString
   categories: Record<string, FunCategoryStats>
 }
+
+/* ---------------------------------------------------------- Learning Zone */
+
+export type LessonLevel = "beginner" | "intermediate" | "advanced"
+export type LessonStyle = "examples" | "story" | "exam"
+
+/** Output of the `learn-lesson` AI job. */
+export interface LessonContent {
+  title: string
+  intro: string
+  keyIdeas: { heading: string; explanation: string; example: string }[]
+  story: { title: string; text: string }
+  method: string[]
+  examples: { question: string; steps: string[]; answer: string }[]
+  tips: string[]
+  mistakes: string[]
+  practice: { question: string; options: string[]; answerIndex: number; explanation: string }[]
+  summary: string[]
+  nextTopics: string[]
+}
+
+/** A lesson the learner generated, kept to reread (also offline). */
+export interface LearnLesson {
+  id: string
+  subject: string
+  topic: string
+  level: LessonLevel
+  style: LessonStyle
+  language: AiLanguage
+  createdAt: ISODateTime
+  /** Set when the quick check was finished. */
+  completedAt?: ISODateTime
+  /** Quick-check score in percent. */
+  score?: number
+  data: LessonContent
+}

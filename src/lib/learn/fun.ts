@@ -83,6 +83,17 @@ export function recordFunGame(result: FunGameResult) {
   })
 }
 
+/** Award XP outside a quiz game (e.g. a Learning Zone lesson); keeps the daily streak going. */
+export function awardXp(xp: number) {
+  funStatsStore.set((prev) => {
+    const s: FunStats = { ...DEFAULT_FUN_STATS, ...prev }
+    const today = todayString()
+    const gap = s.lastPlayed ? differenceInCalendarDays(parseISO(today), parseISO(s.lastPlayed)) : null
+    const dayStreak = gap === null ? 1 : gap === 0 ? Math.max(1, s.dayStreak) : gap === 1 ? s.dayStreak + 1 : 1
+    return { ...s, xp: s.xp + Math.max(0, Math.round(xp)), dayStreak, lastPlayed: today }
+  })
+}
+
 /** Streak shown today: it lapses if the last game was before yesterday. */
 export function liveDayStreak(stats: FunStats) {
   if (!stats.lastPlayed) return 0

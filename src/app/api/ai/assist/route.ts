@@ -10,7 +10,7 @@ const bodySchema = z.object({
 })
 
 /** Jobs that benefit from more varied, creative output. */
-const CREATIVE = new Set<AssistKind>(["plan-day", "routine", "write", "goal-plan", "prompt-run", "english-quiz", "fun-quiz", "logic-puzzle", "decision-advice", "health-insights", "health-plan"])
+const CREATIVE = new Set<AssistKind>(["plan-day", "routine", "write", "goal-plan", "prompt-run", "english-quiz", "fun-quiz", "logic-puzzle", "decision-advice", "health-insights", "health-plan", "learn-lesson"])
 
 const DATE_RULES =
   "Resolve relative dates and times (today, tomorrow, next Friday, tonight, in 2 hours) against the user's current local date-time given below. " +
@@ -106,6 +106,20 @@ const INSTRUCTIONS: Record<AssistKind, string> = {
   "english-quiz":
     "Create multiple-choice English questions on the given topic and level (count from input, max 10). Each has exactly 4 options, one correct answerIndex (0–3), " +
     "and a short explanation of why. Vary the correct position. Questions must be unambiguous with exactly one correct answer.",
+  "learn-lesson":
+    "You are a warm, patient teacher who makes any topic easy. Input JSON: subject, topic (may be anything the learner typed), optional simpler flag, level (beginner | intermediate | advanced) and style " +
+    "(examples = everyday relatable examples, ideally Indian daily life; story = teach through one memorable story whose characters reappear in the examples; exam = competitive-exam focus " +
+    "(school, SSC, bank, railway) with question patterns, shortcuts and time-saving tricks). Write ONE complete lesson: a short catchy title; a simple intro (what it is and why it matters, 2–4 sentences); " +
+    "2–6 key ideas, each with a plain explanation and a concrete easy example (for reasoning, show the working, e.g. family trees as 'A → father of → B', directions as step lists, series with the rule spelled out); " +
+    "a short story (title + 4–10 sentences) that explains the concept through characters and a situation; a step-by-step method for solving or using it (empty if not applicable); " +
+    "1–3 worked examples with a question, clear solution steps and the final answer; up to 5 tips or shortcuts; up to 4 common mistakes; 2–4 practice multiple-choice questions answerable from the lesson " +
+    "(exactly 4 options, one correct answerIndex 0–3, vary its position, short explanation); 2–6 key takeaways for the summary; and up to 4 related topics to learn next. " +
+    "Match depth to the level: beginner = very simple words and small numbers; advanced = deeper rules and harder examples. Be accurate — for facts, grammar and maths double-check every example and answer. " +
+    "If simpler is true, the learner found the last explanation hard: use even simpler words, shorter sentences, smaller numbers and more everyday comparisons. " +
+    "If the topic is unsafe or unsuitable for a learning app, teach a closely related safe topic instead.",
+  "learn-ask":
+    "You are a patient teacher answering a learner's doubt about the lesson described in the input JSON. Give a clear, simple answer (≤ 150 words) that builds on the lesson's ideas, " +
+    "and one short easy example that makes it click. If the question is off-topic, answer briefly if it's a reasonable learning question, otherwise say you can help with this lesson's topic.",
   "logic-puzzle":
     "Create one original logic puzzle for the given category and difficulty (easy | medium | hard). Categories: sequence (number/letter patterns), deduction (who-owns-what grids, " +
     "liars and truth-tellers), lateral (riddles), math (word problems). It must have a single, verifiable answer. Give a short title, the puzzle text, " +
@@ -128,7 +142,7 @@ const INSTRUCTIONS: Record<AssistKind, string> = {
 }
 
 /** Jobs whose JSON is long (several questions, possibly bilingual). */
-const MAX_OUTPUT_TOKENS: Partial<Record<AssistKind, number>> = { "fun-quiz": 8192, "health-plan": 8192 }
+const MAX_OUTPUT_TOKENS: Partial<Record<AssistKind, number>> = { "fun-quiz": 8192, "health-plan": 8192, "learn-lesson": 8192 }
 
 /** Structured AI help for the My Life tools (parse, capture, subtasks, routine, extract, plan). */
 export async function POST(request: Request) {
@@ -245,6 +259,9 @@ function languageRule(kind: AssistKind, lang: "en" | "hi", input: string): strin
       return `Keep questions and options in English (this is English practice). Write explanations in ${L}.`
     case "fun-quiz":
       return funQuizLanguageRule(input)
+    case "learn-lesson":
+    case "learn-ask":
+      return lessonLanguageRule(input)
     case "logic-puzzle":
       return lang === "hi"
         ? "Write the title, puzzle, hint and explanation in Hindi (Devanagari script). Give the answer in Hindi, and include Hindi, English and digit forms in acceptableAnswers."
@@ -276,4 +293,20 @@ function funQuizLanguageRule(input: string): string {
       "translation of the story, the question, the 4 options in the same order, and the explanation."
   }
   return "LANGUAGE: English. Write everything in English. Leave `hindi` out."
+}
+
+/** Learning Zone lessons follow the language picked in the zone (English or Hindi). */
+function lessonLanguageRule(input: string): string {
+  let lang: unknown
+  let subject: unknown
+  try {
+    ;({ language: lang, subject } = JSON.parse(input) as { language?: unknown; subject?: unknown })
+  } catch {
+    // Malformed input: fall through to English.
+  }
+  if (lang !== "hi") return "LANGUAGE: English. Write everything in simple English."
+  return subject === "english" || subject === "vocabulary" || subject === "idioms"
+    ? "LANGUAGE: Hindi. This teaches English to Hindi speakers: write all explanations, the story, steps, tips and takeaways in simple Hindi (Devanagari script), " +
+        "but keep the English words, sentences, idioms and example sentences being taught in English (add a Hindi meaning next to them). Practice options that test English stay in English."
+    : "LANGUAGE: Hindi. Write everything in simple, everyday Hindi (Devanagari script); common English terms may stay in brackets, e.g. सिलोजिज़्म (Syllogism)."
 }
