@@ -9,8 +9,9 @@ import { Notice } from "@/components/common/notice"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
+import { Switch } from "@/components/ui/switch"
 import { downloadBlob, formatBytes, replaceExtension } from "@/lib/files"
-import { decodeImage, disposeCanvas, encodeCanvas, friendlyError, renderResized } from "@/lib/image/canvas"
+import { decodeImage, disposeCanvas, encodeCanvas, friendlyError, removeWhiteBackground, renderResized } from "@/lib/image/canvas"
 import {
   EXTENDED_IMAGE_ACCEPT,
   FORMAT_INFO,
@@ -49,6 +50,7 @@ export function ImageConverterTool() {
   const [formatChoice, setFormatChoice] = useState<ImageMime | null>(null)
   const [quality, setQuality] = useState(90)
   const [background, setBackground] = useState("#ffffff")
+  const [removeWhite, setRemoveWhite] = useState(false)
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [zipping, setZipping] = useState(false)
@@ -61,7 +63,7 @@ export function ImageConverterTool() {
   const format: ImageMime =
     formatChoice && encodable.includes(formatChoice) ? formatChoice : encodable.includes("image/webp") ? "image/webp" : "image/jpeg"
   const lossy = isLossy(format)
-  const settingsKey = JSON.stringify([format, lossy ? quality : 0, format === "image/jpeg" ? background : null])
+  const settingsKey = JSON.stringify([format, lossy ? quality : 0, format === "image/jpeg" ? background : null, removeWhite])
   const formatOpts: Option<ImageMime>[] = useMemo(
     () => encodable.map((m) => ({ value: m, label: FORMAT_INFO[m].label })),
     [encodable]
@@ -145,6 +147,9 @@ export function ImageConverterTool() {
             fit: "stretch",
             background: type === "image/jpeg" ? background : null,
           })
+          if (removeWhite && type !== "image/jpeg") {
+            removeWhiteBackground(canvas)
+          }
           try {
             blob = await encodeCanvas(canvas, type, isLossy(type) ? quality / 100 : undefined)
           } finally {
@@ -342,9 +347,20 @@ export function ImageConverterTool() {
           </div>
           <p className="text-xs text-muted-foreground">JPG has no transparency — transparent areas are filled with this colour.</p>
         </div>
-      ) : format === "image/png" ? (
-        <p className="text-xs text-muted-foreground">PNG is lossless and keeps transparency. Files can be larger than JPG or WebP.</p>
-      ) : null}
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="cnv-remove-white">Remove white background</Label>
+              <p className="text-xs text-muted-foreground">Useful for turning logos into transparent PNGs.</p>
+            </div>
+            <Switch id="cnv-remove-white" checked={removeWhite} onCheckedChange={setRemoveWhite} disabled={busy} />
+          </div>
+          {format === "image/png" ? (
+            <p className="text-xs text-muted-foreground">PNG is lossless and keeps transparency. Files can be larger than JPG or WebP.</p>
+          ) : null}
+        </div>
+      )}
     </>
   )
 

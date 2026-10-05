@@ -13,6 +13,7 @@
     "@base-ui/react": "^1.8.0",
     "@google/genai": "^2.27.0",
     "@hookform/resolvers": "^5.9.1",
+    "@imgly/background-removal": "^1.7.0",
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",

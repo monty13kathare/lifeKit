@@ -188,6 +188,53 @@ export function hasTransparency(canvas: HTMLCanvasElement): boolean {
   return false
 }
 
+/** 
+ * Removes white (or near-white) background from a canvas.
+ * Uses a "Color to Alpha" approach assuming the target color is white (255, 255, 255).
+ * This provides perfect anti-aliasing for logos on white backgrounds.
+ */
+export function removeWhiteBackground(canvas: HTMLCanvasElement) {
+  const ctx = context2d(canvas)
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const data = imageData.data
+  
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    const a = data[i + 3]
+    
+    if (a === 0) continue // already transparent
+    
+    // Find how much white is in this pixel. 
+    // The maximum possible white component is the minimum of R, G, B.
+    const minColor = Math.min(r, g, b)
+    
+    if (minColor === 255) {
+      // Pure white becomes fully transparent
+      data[i + 3] = 0
+    } else if (minColor > 0) {
+      // It's a blend. Calculate the required alpha to achieve this color if blended over pure white.
+      // A = 1 - (minColor / 255)
+      const alpha = (255 - minColor) / 255
+      
+      // Recover the original color before it was blended with white:
+      // r_original = (R - 255 * (1 - A)) / A
+      const bgContrib = 255 * (1 - alpha)
+      
+      data[i] = Math.max(0, Math.min(255, Math.round((r - bgContrib) / alpha)))
+      data[i + 1] = Math.max(0, Math.min(255, Math.round((g - bgContrib) / alpha)))
+      data[i + 2] = Math.max(0, Math.min(255, Math.round((b - bgContrib) / alpha)))
+      
+      // Combine with existing alpha
+      data[i + 3] = Math.round(a * alpha)
+    }
+    // If minColor === 0, it contains pure black or a pure primary color, so it couldn't have been blended with white. Keep as is.
+  }
+  
+  ctx.putImageData(imageData, 0, 0)
+}
+
 /**
  * Encode a canvas, verifying the browser really produced the requested type
  * (Safari silently falls back to PNG for formats it can't encode).

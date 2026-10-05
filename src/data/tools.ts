@@ -14,6 +14,7 @@ import {
   Gamepad2,
   ListTodo,
   Minimize2,
+  Eraser,
   NotebookPen,
   Percent,
   QrCode,
@@ -99,6 +100,7 @@ export const TOOLS: Tool[] = [
   { id: "image-resizer", name: "Resize Image", description: "Change dimensions with handy presets.", href: "/tools/image-resizer", icon: Scaling, category: "images", section: "tools", accent: A.sky },
   { id: "image-compressor", name: "Compress Image", description: "Reduce image size quickly.", href: "/tools/image-compressor", icon: Minimize2, category: "images", section: "tools", accent: A.sky },
   { id: "image-converter", name: "Convert Image", description: "Switch between JPG, PNG and WebP.", href: "/tools/image-converter", icon: Repeat2, category: "images", section: "tools", accent: A.sky },
+  { id: "bg-remover", name: "Remove Background", description: "AI-powered background removal for any photo.", href: "/tools/bg-remover", icon: Eraser, category: "images", section: "tools", accent: A.sky },
 
   // Scan
   { id: "scan", name: "Scan Everything", description: "One camera for QR, barcodes and text.", href: "/scan", icon: Scan, category: "scan", section: "tools", accent: A.indigo },
