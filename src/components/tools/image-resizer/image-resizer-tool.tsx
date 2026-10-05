@@ -116,6 +116,7 @@ export function ImageResizerTool() {
   // Debounced live preview.
   useEffect(() => {
     if (!source || sizeError) return
+    if (preview?.key === settingsKey) return
     const run = ++runId.current
     const timer = setTimeout(async () => {
       setPreviewing(true)
@@ -186,26 +187,44 @@ export function ImageResizerTool() {
   const handlePointerDown = (e: React.PointerEvent) => {
     if (fit !== "cover") return
     if ((e.target as HTMLElement).closest("button")) return
-    e.preventDefault()
-    setDragging(true)
+    
+    if (e.pointerType === "mouse") {
+      e.preventDefault()
+    }
+    
     const startX = e.clientX
     const startY = e.clientY
     const startAlignX = alignX
     const startAlignY = alignY
+    let isDragging = false
 
     const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX
       const dy = ev.clientY - startY
+      
+      if (!isDragging && Math.abs(dx) < 5 && Math.abs(dy) < 5) return
+      if (!isDragging) {
+        isDragging = true
+        setDragging(true)
+      }
+      
       setAlignX(Math.max(0, Math.min(1, startAlignX - dx * 0.003)))
       setAlignY(Math.max(0, Math.min(1, startAlignY - dy * 0.003)))
     }
-    const onUp = () => {
-      setDragging(false)
+    const onUp = (ev: PointerEvent) => {
+      if (isDragging) setDragging(false)
       window.removeEventListener("pointermove", onMove)
       window.removeEventListener("pointerup", onUp)
+      window.removeEventListener("pointercancel", onUp)
+      
+      if (ev.type === "pointercancel") {
+        setAlignX(startAlignX)
+        setAlignY(startAlignY)
+      }
     }
     window.addEventListener("pointermove", onMove)
     window.addEventListener("pointerup", onUp)
+    window.addEventListener("pointercancel", onUp)
   }
 
   const choosePreset = (id: PresetId) => {
@@ -293,7 +312,7 @@ export function ImageResizerTool() {
       <div 
         className={cn(
           "relative flex min-h-56 items-center justify-center overflow-hidden rounded-2xl border bg-checker p-3 sm:min-h-72",
-          fit === "cover" ? "cursor-move touch-none" : ""
+          fit === "cover" ? "cursor-move" : ""
         )}
         onPointerDown={handlePointerDown}
       >
