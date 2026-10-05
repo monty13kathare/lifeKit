@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
+import { useEffect, useEffectEvent, useRef, useState } from "react"
 import {
   ArrowLeft,
   Bookmark,
@@ -9,15 +9,12 @@ import {
   ChevronRight,
   Gauge,
   Pause,
-  Play,
   RotateCcw,
   Sparkles,
   Trash2,
   Type,
   Volume2,
-  VolumeX,
 } from "lucide-react"
-import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { StoryBook, StoryPage } from "@/types"
@@ -42,7 +39,7 @@ interface StoryReaderProps {
   onPageImage: (index: number, imageUrl: string | undefined) => void
 }
 
-/** Picture-book reader: one page at a time, swipe or tap to turn, read aloud with full highlighting. */
+/** Picture-book reader: full-height flex layout so controls never overlap content. */
 export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSave, onDelete, onNewStory }: StoryReaderProps) {
   const lang = story.language
   const t = (en: string, hi: string) => tr(lang, { en, hi })
@@ -50,41 +47,31 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
   const [index, setIndex] = useState(0)
   const [dir, setDir] = useState<1 | -1>(1)
   const [size, setSize] = useState(1)
-  const [speedIdx, setSpeedIdx] = useState(1) // 0=slow, 1=normal, 2=fast
-  const [wordAt, setWordAt] = useState<number | null>(null)
+  const [speedIdx, setSpeedIdx] = useState(1)
   const [autoPlay, setAutoPlay] = useState(false)
-  const [showSpeedMenu, setShowSpeedMenu] = useState(false)
   const voice = useReadAloud(lang)
   const touchX = useRef<number | null>(null)
-  const textRef = useRef<HTMLParagraphElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const atEnd = index === total
   const page: StoryPage | undefined = story.pages[index]
-
-  // Reading progress: 0–100%
-  const progressPct = Math.round(((index) / total) * 100)
+  const progressPct = Math.round((index / total) * 100)
 
   const go = (next: number) => {
     const clamped = Math.max(0, Math.min(total, next))
     if (clamped === index) return
     setDir(clamped > index ? 1 : -1)
     setIndex(clamped)
-    setWordAt(null)
+    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
     if (clamped === total) haptic([30, 50, 30])
   }
 
   const readPage = (i: number) => {
     const p = story.pages[i]
-    if (!p) {
-      setAutoPlay(false)
-      return
-    }
+    if (!p) { setAutoPlay(false); return }
     voice.speak(p.text, {
       rate: SPEED_RATES[speedIdx],
-      onWord: setWordAt,
       onEnd: () => {
-        setWordAt(null)
-        // Brief pause then move to next page automatically.
         window.setTimeout(() => {
           setDir(1)
           setIndex(i + 1)
@@ -99,42 +86,29 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
     if (voice.speaking || autoPlay) {
       voice.stop()
       setAutoPlay(false)
-      setWordAt(null)
       return
     }
     const start = atEnd ? 0 : index
-    if (atEnd) {
-      setDir(-1)
-      setIndex(0)
-    }
+    if (atEnd) { setDir(-1); setIndex(0) }
     setAutoPlay(true)
     readPage(start)
   }
 
-  // Turning a page by hand stops the narration.
   const turn = (next: number) => {
-    if (voice.speaking || autoPlay) {
-      voice.stop()
-      setAutoPlay(false)
-    }
+    if (voice.speaking || autoPlay) { voice.stop(); setAutoPlay(false) }
     go(next)
   }
 
-  // Re-start reading current page when speed changes mid-read.
   const changeSpeed = () => {
     const next = (speedIdx + 1) % SPEED_RATES.length
     setSpeedIdx(next)
     if (voice.speaking || autoPlay) {
       voice.stop()
-      // Small delay so cancellation clears before new speak
-      window.setTimeout(() => {
-        setAutoPlay(true)
-        readPage(index)
-      }, 120)
+      window.setTimeout(() => { setAutoPlay(true); readPage(index) }, 150)
     }
   }
 
-  // Arrow keys turn pages on desktop.
+  // Arrow + Space keyboard shortcuts (desktop)
   const onKey = useEffectEvent((e: KeyboardEvent) => {
     if (e.target instanceof HTMLElement && e.target.closest("input, textarea")) return
     if (e.key === "ArrowRight") turn(index + 1)
@@ -147,30 +121,24 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
     return () => window.removeEventListener("keydown", h)
   }, [])
 
-  // Auto-scroll highlighted sentence into view.
-  useEffect(() => {
-    if (wordAt !== null && textRef.current) {
-      const highlighted = textRef.current.querySelector("[data-hl=\"true\"]")
-      highlighted?.scrollIntoView({ behavior: "smooth", block: "nearest" })
-    }
-  }, [wordAt])
-
-  const words = useMemo(() => (page ? tokenize(page.text) : []), [page])
-
-  // Split into sentence-level chunks for richer highlighting
-  const sentences = useMemo(() => splitSentences(page?.text ?? ""), [page])
-
-  // Find the sentence that contains the current word position
-  const activeSentenceRange = useMemo(() => {
-    if (wordAt === null || !page) return null
-    const s = sentences.find((s) => wordAt >= s.start && wordAt < s.end)
-    return s ?? null
-  }, [wordAt, sentences, page])
 
   return (
-    <div className="mx-auto max-w-2xl space-y-3" lang={lang}>
-      {/* Top bar */}
-      <div className="flex items-center gap-1">
+    /*
+     * Full-height flex column:
+     *   - top-bar   (fixed height)
+     *   - progress  (fixed height)
+     *   - scroll    (flex-1, overflows independently)
+     *   - controls  (fixed height, never overlaps scroll area)
+     *
+     * This avoids the "sticky bar covers content" bug on mobile.
+     */
+    <div
+      className="mx-auto flex max-w-2xl flex-col"
+      style={{ height: "calc(100dvh - 9rem)" }}
+      lang={lang}
+    >
+      {/* ── Top bar ─────────────────────────────────────────────────── */}
+      <div className="flex shrink-0 items-center gap-1 pb-2">
         <Button variant="ghost" size="icon" onClick={onBack} aria-label={t("Back to stories", "कहानियों पर वापस")}>
           <ArrowLeft aria-hidden />
         </Button>
@@ -199,8 +167,8 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
         )}
       </div>
 
-      {/* Progress bar + reading % */}
-      <div className="space-y-1">
+      {/* ── Progress bar ─────────────────────────────────────────────── */}
+      <div className="shrink-0 space-y-0.5 pb-2">
         <div
           className="flex gap-1"
           role="progressbar"
@@ -212,10 +180,7 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
           {Array.from({ length: total + 1 }, (_, i) => (
             <span
               key={i}
-              className={cn(
-                "h-1.5 flex-1 rounded-full transition-colors duration-300",
-                i <= index ? "bg-primary" : "bg-muted"
-              )}
+              className={cn("h-1.5 flex-1 rounded-full transition-colors duration-300", i <= index ? "bg-primary" : "bg-muted")}
             />
           ))}
         </div>
@@ -224,9 +189,10 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
         </p>
       </div>
 
-      {/* Page */}
+      {/* ── Scrollable page content ───────────────────────────────────── */}
       <div
-        className="touch-pan-y"
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-3xl"
         onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
         onTouchEnd={(e) => {
           if (touchX.current === null) return
@@ -244,10 +210,10 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
         >
           {page ? (
             <>
-              {/* Scene illustration (always shown, no image generation) */}
+              {/* Scene illustration */}
               <div className="relative p-2 pb-0">
                 <SceneArt scene={page.scene} />
-                {/* Auto-read indicator badge */}
+                {/* Reading badge */}
                 {(voice.speaking || autoPlay) && (
                   <div className="absolute bottom-4 left-4 flex items-center gap-1.5 rounded-full bg-background/80 px-3 py-1 text-xs font-semibold backdrop-blur">
                     <span className="flex gap-0.5">
@@ -264,31 +230,12 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
                 )}
               </div>
 
-              {/* Story text with word + sentence highlight */}
+              {/* Story text */}
               <p
-                ref={textRef}
-                className={cn("p-5 leading-loose text-pretty sm:p-6", TEXT_SIZES[size])}
-                aria-live={voice.speaking ? "off" : "polite"}
+                className={cn("p-4 leading-loose text-pretty sm:p-6", TEXT_SIZES[size])}
+                aria-live="polite"
               >
-                {words.map((w, i) => {
-                  if (w.space) return <span key={i}>{w.text}</span>
-                  const inSentence =
-                    activeSentenceRange !== null && w.start >= activeSentenceRange.start && w.end <= activeSentenceRange.end
-                  const isCurrentWord = wordAt !== null && wordAt >= w.start && wordAt < w.end
-                  return (
-                    <span
-                      key={i}
-                      data-hl={isCurrentWord ? "true" : undefined}
-                      className={cn(
-                        "rounded transition-all duration-150",
-                        inSentence && !isCurrentWord && "bg-primary/10",
-                        isCurrentWord && "bg-primary/35 font-semibold text-foreground"
-                      )}
-                    >
-                      {w.text}
-                    </span>
-                  )
-                })}
+                {page.text}
               </p>
             </>
           ) : (
@@ -297,14 +244,13 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 space-y-2 lg:bottom-4">
-        {/* Main controls row */}
-        <div className="flex items-center gap-2 rounded-2xl border bg-card/90 p-2 shadow-soft backdrop-blur">
+      {/* ── Controls — always below content, never overlaps ───────────── */}
+      <div className="shrink-0 space-y-1.5 pt-2">
+        <div className="flex items-center gap-2 rounded-2xl border bg-card/95 p-2 shadow-soft backdrop-blur">
           <Button
             variant="outline"
             size="icon"
-            className="size-11"
+            className="size-11 shrink-0"
             onClick={() => turn(index - 1)}
             disabled={index === 0}
             aria-label={t("Previous page", "पिछला पेज")}
@@ -315,24 +261,24 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
           {voice.supported ? (
             <>
               <Button
-                className="h-11 flex-1"
+                className="h-11 min-w-0 flex-1"
                 variant={voice.speaking || autoPlay ? "secondary" : "default"}
                 onClick={toggleRead}
               >
                 {voice.speaking || autoPlay ? <Pause aria-hidden /> : <Volume2 aria-hidden />}
-                {voice.speaking || autoPlay ? t("Pause", "रोकें") : t("Read aloud", "सुनें")}
+                <span className="truncate">
+                  {voice.speaking || autoPlay ? t("Pause", "रोकें") : t("Read aloud", "सुनें")}
+                </span>
               </Button>
-              {/* Speed control */}
+              {/* Speed chip — shows current speed inline */}
               <Button
                 variant="outline"
-                size="icon"
-                className="size-11 shrink-0 tabular-nums text-xs font-bold"
+                className="h-11 shrink-0 gap-1 px-3 text-xs font-bold tabular-nums"
                 onClick={changeSpeed}
                 aria-label={t("Reading speed", "पढ़ने की गति")}
-                title={t("Reading speed", "पढ़ने की गति")}
               >
-                <Gauge className="size-4" aria-hidden />
-                <span className="sr-only">{SPEED_LABELS[speedIdx]}</span>
+                <Gauge className="size-3.5 shrink-0" aria-hidden />
+                {SPEED_LABELS[speedIdx]}
               </Button>
             </>
           ) : (
@@ -341,14 +287,14 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
             </span>
           )}
 
-          <span className="w-12 text-center text-sm font-medium text-muted-foreground tabular-nums">
+          <span className="w-10 shrink-0 text-center text-sm font-medium tabular-nums text-muted-foreground">
             {atEnd ? "✓" : `${index + 1}/${total}`}
           </span>
 
           <Button
             variant="outline"
             size="icon"
-            className="size-11"
+            className="size-11 shrink-0"
             onClick={() => turn(index + 1)}
             disabled={atEnd}
             aria-label={t("Next page", "अगला पेज")}
@@ -357,21 +303,12 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
           </Button>
         </div>
 
-        {/* Speed label + voice warning */}
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-1">
-          {voice.supported && (
-            <p className="text-xs text-muted-foreground">
-              {t("Speed", "गति")}: <span className="font-semibold text-foreground">{SPEED_LABELS[speedIdx]}</span>
-              {" · "}
-              {t("tap Gauge to change", "गति बदलने के लिए Gauge दबाएँ")}
-            </p>
-          )}
-          {voice.supported && !voice.hasVoice && lang === "hi" && (
-            <p className="text-xs text-muted-foreground">
-              {t("No Hindi voice installed — using default voice.", "हिंदी आवाज़ नहीं मिली — डिफ़ॉल्ट आवाज़ इस्तेमाल की जा रही है।")}
-            </p>
-          )}
-        </div>
+        {/* Voice hint */}
+        {voice.supported && !voice.hasVoice && lang === "hi" && (
+          <p className="text-center text-xs text-muted-foreground">
+            {t("No Hindi voice installed — using default voice.", "हिंदी आवाज़ नहीं मिली — डिफ़ॉल्ट आवाज़ इस्तेमाल की जा रही है।")}
+          </p>
+        )}
       </div>
     </div>
   )
@@ -379,7 +316,7 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
 
 function EndPage({ story, onRestart, onNewStory, lang }: { story: StoryBook; onRestart: () => void; onNewStory: () => void; lang: StoryBook["language"] }) {
   return (
-    <div className="relative flex min-h-80 flex-col items-center justify-center gap-4 bg-linear-to-br from-primary/12 via-card to-card p-6 text-center">
+    <div className="relative flex min-h-72 flex-col items-center justify-center gap-4 bg-linear-to-br from-primary/12 via-card to-card p-6 text-center">
       <Confetti pieces={28} />
       <p className="animate-lk-drop font-serif text-4xl font-bold tracking-tight">{tr(lang, { en: "The End", hi: "समाप्त" })}</p>
       {story.moral && (
@@ -400,22 +337,10 @@ function EndPage({ story, onRestart, onNewStory, lang }: { story: StoryBook; onR
   )
 }
 
-/** Split text into words and spaces with character offsets (for word highlighting). */
 function tokenize(text: string) {
   const out: { text: string; start: number; end: number; space: boolean }[] = []
   const re = /\s+|[^\s]+/g
   let m: RegExpExecArray | null
   while ((m = re.exec(text))) out.push({ text: m[0], start: m.index, end: m.index + m[0].length, space: /^\s/.test(m[0]) })
-  return out
-}
-
-/** Split text into sentence ranges for background sentence highlighting. */
-function splitSentences(text: string): { start: number; end: number }[] {
-  const out: { start: number; end: number }[] = []
-  const re = /[^.!?।\n]+[.!?।\n]?/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(text))) {
-    if (m[0].trim()) out.push({ start: m.index, end: m.index + m[0].length })
-  }
   return out
 }
