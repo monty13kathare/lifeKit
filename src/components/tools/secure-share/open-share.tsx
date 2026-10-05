@@ -272,8 +272,9 @@ export function OpenShare() {
 
         <div className="grid gap-2 sm:grid-cols-2">
           {allow && current ? (
-            <Button size="lg" onClick={() => downloadBlob(current, current.name)}>
-              <Download aria-hidden /> Download {opened.files.length > 1 ? "this file" : current.name}
+            <Button size="lg" onClick={() => downloadBlob(current, current.name)} className="min-w-0 overflow-hidden">
+              <Download className="shrink-0" aria-hidden /> 
+              <span className="truncate">Download {opened.files.length > 1 ? "this file" : current.name}</span>
             </Button>
           ) : null}
           <Button size="lg" variant="outline" onClick={reset} className={cn(!(allow && current) && "sm:col-span-2")}>

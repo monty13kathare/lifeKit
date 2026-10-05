@@ -205,34 +205,20 @@ export function Summarizer() {
           ) : null}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Or upload a file</p>
-            <FileDropzone
-              compact
-              accept={FILE_ACCEPT}
-              maxBytes={SUMMARY_FILE_MAX_BYTES}
-              hint=".txt or .md, up to 2 MB"
-              title="Choose a text file"
-              disabled={busy}
-              onFiles={(f) => void onFile(f)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="summary-note">Or summarize a note</Label>
-            <Select items={noteItems} value={noteId} onValueChange={(v) => onPickNote(v as string | null)} disabled={!hydrated || !noteItems.length || busy}>
-              <SelectTrigger id="summary-note" className="w-full">
-                <SelectValue placeholder={hydrated && !noteItems.length ? "No notes yet" : "Pick a note"} />
-              </SelectTrigger>
-              <SelectContent>
-                {noteItems.map((n) => (
-                  <SelectItem key={n.value} value={n.value}>
-                    {n.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="summary-note">Or summarize a note</Label>
+          <Select items={noteItems} value={noteId} onValueChange={(v) => onPickNote(v as string | null)} disabled={!hydrated || !noteItems.length || busy}>
+            <SelectTrigger id="summary-note" className="w-full sm:max-w-md">
+              <SelectValue placeholder={hydrated && !noteItems.length ? "No notes yet" : "Pick a note"} />
+            </SelectTrigger>
+            <SelectContent>
+              {noteItems.map((n) => (
+                <SelectItem key={n.value} value={n.value}>
+                  {n.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="rounded-2xl border bg-card p-4 shadow-soft">
