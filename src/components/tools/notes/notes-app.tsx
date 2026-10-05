@@ -288,19 +288,19 @@ export function NotesApp() {
             aria-current={selected ? "true" : undefined}
             className="min-w-0 flex-1 rounded-xl p-3 pr-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
           >
-            <span className="flex items-start justify-between gap-2">
-              <span className="flex min-w-0 items-center gap-1.5">
+            <span className="flex min-w-0 items-start justify-between gap-2">
+              <span className="flex min-w-0 items-start gap-1.5 pt-0.5">
                 {n.pinned ? (
                   <>
                     <Pin className="size-3.5 shrink-0 text-primary" aria-hidden />
                     <span className="sr-only">Pinned: </span>
                   </>
                 ) : null}
-                <span className={cn("min-w-0 truncate font-medium", isBlank(n) && "text-muted-foreground italic")}>
+                <span className={cn("line-clamp-2 min-w-0 font-medium wrap-break-word", isBlank(n) && "text-muted-foreground italic")}>
                   {noteDisplayTitle(n)}
                 </span>
               </span>
-              <span className="shrink-0 text-xs text-muted-foreground">
+              <span className="shrink-0 text-xs text-muted-foreground mt-0.5">
                 {shortDate(sort === "created" ? n.createdAt : n.updatedAt)}
               </span>
             </span>

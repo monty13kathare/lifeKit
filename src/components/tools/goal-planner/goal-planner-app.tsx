@@ -171,11 +171,11 @@ export function GoalPlannerApp() {
           ) : (
             <>
               <Tabs value={tab} onValueChange={(v) => setTab(v as Status)}>
-                <TabsList className="h-11! w-full sm:w-auto">
+                <TabsList className="h-auto w-full flex-wrap justify-start sm:w-auto sm:flex-nowrap">
                   {(["active", "achieved", "archived"] as Status[]).map((s) => (
                     <TabsTrigger key={s} value={s} className="px-3">
                       {GOAL_STATUS_LABEL[s]}
-                      <span className="text-xs text-muted-foreground tabular-nums">{counts[s]}</span>
+                      <span className="ml-2 text-xs text-muted-foreground tabular-nums">{counts[s]}</span>
                     </TabsTrigger>
                   ))}
                 </TabsList>
@@ -254,17 +254,17 @@ function GoalCard({ goal, byId, today, onOpen }: { goal: Goal; byId: Map<string,
           <span className="text-xs font-semibold tabular-nums">{pct}%</span>
         )}
       </ProgressRing>
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{goal.title}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {p.milestonesDone}/{p.milestonesTotal} milestones
-          {p.tasksTotal ? ` · ${Math.round(p.taskRatio * 100)}% of ${p.tasksTotal} tasks` : ""}
-        </p>
-        {dl ? (
-          <p className={cn("mt-1 inline-flex items-center gap-1 text-xs font-medium", dl.overdue ? "text-destructive" : dl.soon ? "text-warning-foreground dark:text-warning" : "text-muted-foreground")}>
-            <CalendarDays className="size-3.5" aria-hidden /> {dl.label}
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 font-medium wrap-break-word">{goal.title}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {p.milestonesDone}/{p.milestonesTotal} milestones
+            {p.tasksTotal ? ` · ${Math.round(p.taskRatio * 100)}% of ${p.tasksTotal} tasks` : ""}
           </p>
-        ) : goal.status === "achieved" && goal.achievedAt ? (
+          {dl ? (
+            <p className={cn("mt-1 inline-flex flex-wrap items-center gap-1 text-xs font-medium", dl.overdue ? "text-destructive" : dl.soon ? "text-warning-foreground dark:text-warning" : "text-muted-foreground")}>
+              <CalendarDays className="size-3.5 shrink-0" aria-hidden /> {dl.label}
+            </p>
+          ) : goal.status === "achieved" && goal.achievedAt ? (
           <p className="mt-1 text-xs text-success">Achieved {formatShort(goal.achievedAt.slice(0, 10))}</p>
         ) : null}
       </div>
