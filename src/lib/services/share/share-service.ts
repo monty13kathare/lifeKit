@@ -57,12 +57,12 @@ export interface SharePackageInfo {
   protection: ShareProtection
   fileCount: number
   encryptedSize: number
+  notes?: string
 }
 
 export interface OpenedShare {
   info: SharePackageInfo
   files: File[]
-  notes?: string
 }
 
 export type ShareErrorCode = "invalid-package" | "unsupported-version" | "expired" | "wrong-secret" | "too-large" | "unsupported"

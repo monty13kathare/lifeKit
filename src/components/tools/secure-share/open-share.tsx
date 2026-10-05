@@ -211,12 +211,7 @@ export function OpenShare() {
           {format(new Date(opened.info.expiresAt), "PPp")}.
         </Notice>
 
-        {opened.notes ? (
-          <section className="rounded-2xl border bg-card p-4 shadow-soft">
-            <h2 className="mb-1 text-sm font-medium">Note from the sender</h2>
-            <p className="text-sm whitespace-pre-wrap text-muted-foreground">{opened.notes}</p>
-          </section>
-        ) : null}
+
 
         {!allow ? (
           <Notice tone="warning" title="View only mode">
@@ -366,6 +361,12 @@ export function OpenShare() {
                 <Clock className="size-4" aria-hidden />
                 Expires in {formatDistanceToNowStrict(new Date(info.expiresAt))} ({format(new Date(info.expiresAt), "PPp")})
               </p>
+              {info.notes ? (
+                <div className="rounded-xl bg-surface-muted p-3">
+                  <h3 className="mb-1 text-xs font-semibold text-foreground uppercase tracking-wider">Note from sender</h3>
+                  <p className="text-sm whitespace-pre-wrap text-muted-foreground">{info.notes}</p>
+                </div>
+              ) : null}
               <form onSubmit={open} className="space-y-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="ss-secret">{isKey ? "Share key" : "Password"}</Label>

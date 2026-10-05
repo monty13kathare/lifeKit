@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react"
 import { format } from "date-fns"
 import { z } from "zod"
 import {
-  Download,
   Eye,
   EyeOff,
   Globe,
@@ -20,6 +19,7 @@ import {
 import { toast } from "sonner"
 import { CopyButton } from "@/components/common/copy-button"
 import { FileDropzone } from "@/components/common/file-dropzone"
+import { DateTimePicker } from "@/components/common/datetime-picker"
 import { Notice } from "@/components/common/notice"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,7 +28,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { generatePassphrase } from "@/components/tools/password-generator/generator"
 import { WORDLIST } from "@/components/tools/password-generator/wordlist"
-import { downloadBlob, formatBytes, MB } from "@/lib/files"
+import { formatBytes, MB } from "@/lib/files"
 import { renderQrCanvas } from "@/lib/qr/render"
 import { services } from "@/lib/services"
 import { getShareService, MAX_SHARE_BYTES, PBKDF2_ITERATIONS, ShareError, type ShareResult, type ShareStage } from "@/lib/services/share"
@@ -50,7 +50,7 @@ const STAGE_LABEL: Record<ShareStage, string> = {
   reading: "Reading files…",
   "deriving-key": "Strengthening your password…",
   encrypting: "Encrypting with AES-256…",
-  uploading: "Uploading encrypted package to cloud relay…",
+  uploading: "Uploading to secure relay…",
   downloading: "Downloading encrypted package…",
   decrypting: "Decrypting…",
   done: "Done",
@@ -80,7 +80,6 @@ export function CreateShare() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [allowDownload, setAllowDownload] = useState(true)
-  const [isPublicLink, setIsPublicLink] = useState(true)
   const [notes, setNotes] = useState("")
   const [stage, setStage] = useState<ShareStage | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -135,7 +134,7 @@ export function CreateShare() {
         password: password || undefined,
         allowDownload,
         notes,
-        isPublicLink,
+        isPublicLink: true,
         onStage: setStage,
       })
       if (result) service.release(result)
@@ -225,17 +224,6 @@ export function CreateShare() {
       </div>
 
       <section aria-label="Protection settings" className="space-y-5 rounded-2xl border bg-card p-4 shadow-soft sm:p-5 lg:sticky lg:top-6">
-        <div className="flex items-start justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
-          <Label htmlFor="ss-public-link" className="font-normal cursor-pointer">
-            <span className="font-medium text-foreground flex items-center gap-1.5">
-              <Globe className="size-4 text-primary" /> Generate Public Link
-            </span>
-            <span className="block text-xs text-muted-foreground mt-0.5">
-              Uploads AES-256 encrypted package to ephemeral cloud so anyone with the link can open it anywhere.
-            </span>
-          </Label>
-          <Switch id="ss-public-link" checked={isPublicLink} onCheckedChange={setIsPublicLink} />
-        </div>
 
         <fieldset className="space-y-2">
           <legend className="mb-2 text-sm font-medium">Expires after</legend>
@@ -260,12 +248,10 @@ export function CreateShare() {
               <Label htmlFor="ss-expiry" className="text-xs text-muted-foreground">
                 Expiry date and time
               </Label>
-              <Input
+              <DateTimePicker
                 id="ss-expiry"
-                type="datetime-local"
                 value={customExpiry}
-                onChange={(e) => setCustomExpiry(e.target.value)}
-                aria-invalid={!!errors.expiresAt}
+                onChange={setCustomExpiry}
               />
             </div>
           ) : null}
@@ -357,7 +343,7 @@ export function CreateShare() {
         <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] -mx-1 bg-card px-1 pt-1 lg:static">
           <Button size="lg" className="w-full" onClick={create} disabled={!files.length || tooLarge || busy}>
             {busy ? <Loader2 className="animate-spin" aria-hidden /> : <Lock aria-hidden />}
-            {busy ? STAGE_LABEL[stage!] : isPublicLink ? "Generate secure share link" : "Create offline package"}
+            {busy ? STAGE_LABEL[stage!] : "Generate secure link"}
           </Button>
           <p className="mt-2 text-center text-xs text-muted-foreground" aria-live="polite">
             {files.length
@@ -390,11 +376,14 @@ function ShareResultView({ result, onReset }: { result: ShareResult; onReset: ()
       try {
         await navigator.share({
           title: "Secure files shared via LifeKit",
-          text:
-            result.protection === "password"
-              ? "Here are encrypted files. You will need the password I sent you to decrypt them:"
-              : "Here are secure files shared with you. Click to open and decrypt instantly in your browser:",
-          url: result.publicUrl,
+          text: `🔒 Secure Files Shared via LifeKit
+
+I've shared ${result.fileCount} encrypted file${result.fileCount === 1 ? "" : "s"} with you.
+
+${result.protection === "password" ? "🔐 These files are password-protected. You'll need the password I sent to decrypt them." : "✨ Open the link below to decrypt and view the files instantly."}
+⏱️ Expires: ${format(expires, "PPp")}
+
+🔗 ${result.publicUrl}`,
         })
         return
       } catch {
@@ -402,14 +391,17 @@ function ShareResultView({ result, onReset }: { result: ShareResult; onReset: ()
       }
     }
 
-    // Fallback to sharing the package file
     const ok = await services.file.share({
       files: [pkg],
-      title: "Encrypted file",
-      text:
-        result.protection === "password"
-          ? "Open this with LifeKit → SecureShare → Open a package. I'll send you the password separately."
-          : "Open this with LifeKit → SecureShare → Open a package. I'll send you the share key separately.",
+      title: "Encrypted files via LifeKit",
+      text: `🔒 Secure Files Shared via LifeKit
+
+I've shared ${result.fileCount} encrypted file${result.fileCount === 1 ? "" : "s"} with you.
+
+${result.protection === "password" ? "🔐 These files are password-protected. I'll send you the password separately." : "✨ These files are protected with a unique share key. I'll send it separately."}
+To open this, use LifeKit → SecureShare → Open a package.
+⏱️ Expires: ${format(expires, "PPp")}
+`,
     })
     if (!ok) toast.info("Sharing was cancelled or isn't available — you can copy the link or download the package.")
   }
@@ -506,23 +498,7 @@ function ShareResultView({ result, onReset }: { result: ShareResult; onReset: ()
         </Notice>
       ) : null}
 
-      {/* Offline Package File Card */}
-      <section className="space-y-3 rounded-2xl border bg-card p-4 shadow-soft sm:p-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-muted text-muted-foreground">
-            <Lock className="size-5" aria-hidden />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium text-sm">{pkg.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {formatBytes(pkg.size)} · Standalone offline encrypted container
-            </p>
-          </div>
-          <Button variant="outline" className="w-full sm:w-auto" onClick={() => downloadBlob(pkg, pkg.name)}>
-            <Download aria-hidden /> Download .lifekit
-          </Button>
-        </div>
-      </section>
+
 
       <Button variant="outline" size="lg" className="w-full" onClick={onReset}>
         <RotateCcw aria-hidden /> Protect & share other files

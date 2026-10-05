@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { FileLock2, LockOpen } from "lucide-react"
-import { Notice, UnsupportedNotice } from "@/components/common/notice"
+import { UnsupportedNotice } from "@/components/common/notice"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useHydrated } from "@/hooks/use-store"
@@ -33,11 +33,7 @@ export function SecureShare() {
 
   return (
     <div className="space-y-4">
-      <Notice tone="info" title="End-to-End Encrypted File Sharing (Zero-Knowledge AES-256-GCM)">
-        Files are packed and encrypted directly inside your browser before anything leaves your device.
-        When you generate a public link, only the encrypted package is uploaded. The decryption key stays
-        in the link URL hash and is never transmitted to any server.
-      </Notice>
+
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList className="w-full sm:w-auto">

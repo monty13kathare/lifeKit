@@ -49,6 +49,7 @@ export const headerSchema = z.object({
   expiresAt: z.string(),
   allowDownload: z.boolean(),
   fileCount: z.number().int().min(1),
+  notes: z.string().optional(),
 })
 export type PackageHeader = z.infer<typeof headerSchema>
 
@@ -56,9 +57,8 @@ export const metaSchema = z.object({
   files: z.array(
     z.object({ name: z.string(), type: z.string(), size: z.number().int().min(0), lastModified: z.number().optional() })
   ),
-  notes: z.string().optional(),
 })
-export type PackageMeta = { files: SharedFileInfo[]; notes?: string }
+export type PackageMeta = { files: SharedFileInfo[] }
 
 const enc = new TextEncoder()
 const dec = new TextDecoder()
@@ -85,10 +85,9 @@ export function importRawKey(raw: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
 }
 
 /** Assemble the plaintext: metadata length + metadata + file bytes. */
-export async function buildPlaintext(files: File[], notes: string | undefined): Promise<Uint8Array<ArrayBuffer>> {
+export async function buildPlaintext(files: File[]): Promise<Uint8Array<ArrayBuffer>> {
   const meta: PackageMeta = {
     files: files.map((f) => ({ name: f.name, type: f.type, size: f.size, lastModified: f.lastModified })),
-    notes: notes?.trim() ? notes.trim() : undefined,
   }
   const metaBytes = enc.encode(JSON.stringify(meta))
   const total = 4 + metaBytes.length + files.reduce((n, f) => n + f.size, 0)

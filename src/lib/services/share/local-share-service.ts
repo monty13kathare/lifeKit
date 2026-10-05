@@ -38,6 +38,7 @@ function infoFrom(header: PackageHeader, encryptedSize: number, now = Date.now()
     protection: protectionOf(header),
     fileCount: header.fileCount,
     encryptedSize,
+    notes: header.notes,
   }
 }
 
@@ -95,11 +96,12 @@ export class LocalShareService implements ShareService {
       expiresAt: options.expiresAt.toISOString(),
       allowDownload: options.allowDownload,
       fileCount: files.length,
+      notes: options.notes?.trim() ? options.notes.trim() : undefined,
     }
     const headerBytes = encodeHeader(header)
 
     stage("reading")
-    const plaintext = await buildPlaintext(files, options.notes)
+    const plaintext = await buildPlaintext(files)
     stage("encrypting")
     const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: headerBytes }, key, plaintext)
     plaintext.fill(0)
@@ -184,9 +186,9 @@ export class LocalShareService implements ShareService {
           : "Couldn't decrypt: the password is wrong, or the package was modified."
       )
     }
-    const { meta, files } = parsePlaintext(new Uint8Array(plain))
+    const { files } = parsePlaintext(new Uint8Array(plain))
     options?.onStage?.("done")
-    return { info, files, notes: meta.notes }
+    return { info, files }
   }
 
   release(result: ShareResult) {
