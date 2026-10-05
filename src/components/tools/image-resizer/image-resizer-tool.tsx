@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { downloadBlob, formatBytes, replaceExtension } from "@/lib/files"
+import { cn } from "@/lib/utils"
 import {
   checkCanvasSize,
   decodeImage,
@@ -36,10 +37,13 @@ import { QualityField, Segmented, SelectField, Workspace, formatOptions, type Op
 import { useEncodableFormats, useObjectUrls } from "../image-shared/hooks"
 import { PRESETS, getPreset, type PresetId } from "./presets"
 
+
+
 interface Source {
   file: File
   mime: string
   img: DecodedImage
+  url: string
 }
 
 interface Preview {
@@ -52,8 +56,8 @@ interface Preview {
 }
 
 const FIT_OPTIONS: Option<FitMode>[] = [
-  { value: "cover", label: "Cover (crop)" },
-  { value: "contain", label: "Contain (pad)" },
+  { value: "cover", label: "Cover" },
+  { value: "contain", label: "Contain" },
   { value: "stretch", label: "Stretch" },
 ]
 const PRESET_OPTIONS: Option<PresetId>[] = PRESETS.map((p) => ({ value: p.id, label: p.label }))
@@ -77,6 +81,8 @@ export function ImageResizerTool() {
   const [quality, setQuality] = useState(90)
   const [padColor, setPadColor] = useState("#ffffff")
   const [transparentPad, setTransparentPad] = useState(false)
+  const [alignX, setAlignX] = useState(0.5)
+  const [alignY, setAlignY] = useState(0.5)
   const [preview, setPreview] = useState<Preview | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
@@ -103,8 +109,8 @@ export function ImageResizerTool() {
     outType === "image/jpeg" ? padColor : effectiveFit === "contain" && !transparentPad ? padColor : null
 
   const settingsKey = useMemo(
-    () => JSON.stringify([source?.file.name, source?.file.lastModified, width, height, effectiveFit, outType, lossy ? quality : 0, background]),
-    [source, width, height, effectiveFit, outType, lossy, quality, background]
+    () => JSON.stringify([source?.file.name, source?.file.lastModified, width, height, effectiveFit, alignX, alignY, outType, lossy ? quality : 0, background]),
+    [source, width, height, effectiveFit, alignX, alignY, outType, lossy, quality, background]
   )
 
   // Debounced live preview.
@@ -114,7 +120,7 @@ export function ImageResizerTool() {
     const timer = setTimeout(async () => {
       setPreviewing(true)
       try {
-        const canvas = renderResized(source.img, { width, height, fit: effectiveFit, background })
+        const canvas = renderResized(source.img, { width, height, fit: effectiveFit, background, alignX, alignY })
         let blob: Blob
         try {
           blob = await encodeCanvas(canvas, outType, lossy ? quality / 100 : undefined)
@@ -143,7 +149,10 @@ export function ImageResizerTool() {
       const img = await decodeImage(file).catch(() => {
         throw new Error("This browser can't read this image. It may be corrupted or in an unsupported format.")
       })
-      setSource({ file, mime: mimeOf(file), img })
+      setSource((prev) => {
+        if (prev?.url) urls.revoke(prev.url)
+        return { file, mime: mimeOf(file), img, url: urls.create(file) }
+      })
       setPreviewError(null)
       const p = getPreset(preset)
       if (p.width && p.height) {
@@ -161,6 +170,7 @@ export function ImageResizerTool() {
   }
 
   const reset = () => {
+    if (source?.url) urls.revoke(source.url)
     urls.revoke(previewUrl.current)
     previewUrl.current = null
     runId.current++
@@ -169,6 +179,33 @@ export function ImageResizerTool() {
     setPreviewing(false)
     setPreviewError(null)
     setPreset("custom")
+  }
+
+  const [dragging, setDragging] = useState(false)
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (fit !== "cover") return
+    if ((e.target as HTMLElement).closest("button")) return
+    e.preventDefault()
+    setDragging(true)
+    const startX = e.clientX
+    const startY = e.clientY
+    const startAlignX = alignX
+    const startAlignY = alignY
+
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX
+      const dy = ev.clientY - startY
+      setAlignX(Math.max(0, Math.min(1, startAlignX - dx * 0.003)))
+      setAlignY(Math.max(0, Math.min(1, startAlignY - dy * 0.003)))
+    }
+    const onUp = () => {
+      setDragging(false)
+      window.removeEventListener("pointermove", onMove)
+      window.removeEventListener("pointerup", onUp)
+    }
+    window.addEventListener("pointermove", onMove)
+    window.addEventListener("pointerup", onUp)
   }
 
   const choosePreset = (id: PresetId) => {
@@ -253,19 +290,31 @@ export function ImageResizerTool() {
         </Button>
       </div>
 
-      <div className="relative flex min-h-56 items-center justify-center overflow-hidden rounded-2xl border bg-checker p-3 sm:min-h-72">
-        {preview ? (
+      <div 
+        className={cn(
+          "relative flex min-h-56 items-center justify-center overflow-hidden rounded-2xl border bg-checker p-3 sm:min-h-72",
+          fit === "cover" ? "cursor-move touch-none" : ""
+        )}
+        onPointerDown={handlePointerDown}
+      >
+        {source && !sizeError ? (
           // eslint-disable-next-line @next/next/no-img-element -- local blob URL
           <img
-            src={preview.url}
-            alt={`Resized preview, ${preview.width} by ${preview.height} pixels`}
-            className="max-h-[55vh] max-w-full object-contain shadow-soft"
-            style={{ aspectRatio: `${preview.width} / ${preview.height}` }}
+            src={source.url}
+            alt={`Live preview`}
+            className="max-h-[55vh] max-w-full shadow-soft"
+            style={{ 
+              aspectRatio: `${width} / ${height}`,
+              objectFit: fit === "contain" ? "contain" : fit === "cover" ? "cover" : "fill",
+              objectPosition: fit === "contain" ? "center" : `${alignX * 100}% ${alignY * 100}%`,
+              backgroundColor: canBeTransparent && transparentPad && fit === "contain" ? "transparent" : padColor,
+              pointerEvents: "none"
+            }}
           />
         ) : (
           <ImageIcon className="size-10 text-muted-foreground" aria-hidden />
         )}
-        {previewing ? (
+        {previewing && !dragging ? (
           <span className="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium shadow-soft">
             <LoaderCircle className="size-3.5 animate-spin" aria-hidden /> Updating
           </span>
@@ -354,7 +403,14 @@ export function ImageResizerTool() {
       </div>
 
       {source && ratioDiffers ? (
-        <Segmented label="Fit" value={fit} onChange={setFit} options={FIT_OPTIONS} columns={3} />
+        <div className="space-y-4">
+          <Segmented label="Fit" value={fit} onChange={setFit} options={FIT_OPTIONS} columns={3} />
+          {fit === "cover" ? (
+            <p className="text-xs text-muted-foreground">
+              Drag the picture above to adjust exactly which part gets kept.
+            </p>
+          ) : null}
+        </div>
       ) : null}
 
       {source && (outType === "image/jpeg" || effectiveFit === "contain") ? (

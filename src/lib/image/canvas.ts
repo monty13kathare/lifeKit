@@ -122,10 +122,15 @@ export interface RenderOptions {
   fit?: FitMode
   /** Fill colour behind the image (padding / transparency). `null` keeps transparency. */
   background?: string | null
+  /** Crop alignment X (0 to 1), default 0.5 (center) */
+  alignX?: number
+  /** Crop alignment Y (0 to 1), default 0.5 (center) */
+  alignY?: number
 }
 
 /** Resize an image into a new canvas using the given fit mode. */
-export function renderResized(img: DecodedImage, { width, height, fit = "stretch", background }: RenderOptions) {
+export function renderResized(img: DecodedImage, options: RenderOptions) {
+  const { width, height, fit = "stretch", background } = options
   const W = Math.round(width)
   const H = Math.round(height)
   const canvas = createCanvas(W, H)
@@ -142,7 +147,9 @@ export function renderResized(img: DecodedImage, { width, height, fit = "stretch
     const scale = Math.max(W / iw, H / ih)
     const sw = W / scale
     const sh = H / scale
-    drawHighQuality(ctx, img.source, (iw - sw) / 2, (ih - sh) / 2, sw, sh, 0, 0, W, H)
+    const ax = options.alignX ?? 0.5
+    const ay = options.alignY ?? 0.5
+    drawHighQuality(ctx, img.source, (iw - sw) * ax, (ih - sh) * ay, sw, sh, 0, 0, W, H)
   } else {
     const scale = Math.min(W / iw, H / ih)
     const dw = Math.max(1, Math.round(iw * scale))
