@@ -61,7 +61,15 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
     if (clamped === index) return
     setDir(clamped > index ? 1 : -1)
     setIndex(clamped)
-    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })
+    
+    // Scroll back up to the story if user is far down
+    if (scrollRef.current) {
+      const rect = scrollRef.current.getBoundingClientRect()
+      if (rect.top < 0) {
+        scrollRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+    }
+    
     if (clamped === total) haptic([30, 50, 30])
   }
 
@@ -132,8 +140,7 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
      * This avoids the "sticky bar covers content" bug on mobile.
      */
     <div
-      className="mx-auto flex max-w-2xl flex-col"
-      style={{ height: "calc(100dvh - 9rem)" }}
+      className="mx-auto flex max-w-2xl flex-col pb-6"
       lang={lang}
     >
       {/* ── Top bar ─────────────────────────────────────────────────── */}
@@ -188,10 +195,10 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
         </p>
       </div>
 
-      {/* ── Scrollable page content ───────────────────────────────────── */}
+      {/* ── Page content ───────────────────────────────────── */}
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-3xl"
+        className="rounded-3xl"
       >
         <div
           key={index}
@@ -236,8 +243,8 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
         </div>
       </div>
 
-      {/* ── Controls — always below content, never overlaps ───────────── */}
-      <div className="shrink-0 space-y-1.5 pt-2">
+      {/* ── Controls — sticky at the bottom of the viewport ───────────── */}
+      <div className="sticky bottom-4 z-10 shrink-0 space-y-1.5 pt-2">
         <div className="flex items-center gap-2 rounded-2xl border bg-card/95 p-2 shadow-soft backdrop-blur">
           <Button
             variant="outline"
