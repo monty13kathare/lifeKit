@@ -9,7 +9,7 @@ const bodySchema = z.object({
   text: z.string().trim().min(1).max(60_000),
   theme: z
     .string()
-    .regex(/^[A-Za-z &]{1,40} (accent #[0-9a-fA-F]{6})$/)
+    .regex(/^[A-Za-z &]{1,40} \(accent #[0-9a-fA-F]{6}\)$/)
     .optional(),
 })
 
