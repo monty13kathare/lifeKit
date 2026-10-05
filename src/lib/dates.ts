@@ -41,6 +41,16 @@ export function greeting(now = new Date()): string {
 
 export function stepRecurrence(date: Date, recurrence: Recurrence, n = 1): Date {
   switch (recurrence) {
+    case "minutely":
+      return new Date(date.getTime() + n * 60_000)
+    case "15_min":
+      return new Date(date.getTime() + n * 15 * 60_000)
+    case "30_min":
+      return new Date(date.getTime() + n * 30 * 60_000)
+    case "hourly":
+      return new Date(date.getTime() + n * 60 * 60_000)
+    case "90_min":
+      return new Date(date.getTime() + n * 90 * 60_000)
     case "daily":
       return addDays(date, n)
     case "weekly":
@@ -80,10 +90,35 @@ export function expandEvents(events: CalendarEvent[], rangeStart: Date, rangeEnd
 
     // Jump close to the range start for daily/weekly recurrences to avoid long loops.
     let n = 0
-    if (event.recurrence === "daily" || event.recurrence === "weekly") {
-      const step = event.recurrence === "daily" ? 1 : 7
-      const gap = differenceInCalendarDays(rangeStart, baseStart)
-      if (gap > step) n = Math.floor(gap / step) - 1
+    if (
+      event.recurrence === "minutely" ||
+      event.recurrence === "15_min" ||
+      event.recurrence === "30_min" ||
+      event.recurrence === "hourly" ||
+      event.recurrence === "90_min" ||
+      event.recurrence === "daily" ||
+      event.recurrence === "weekly"
+    ) {
+      if (
+        event.recurrence === "minutely" ||
+        event.recurrence === "15_min" ||
+        event.recurrence === "30_min" ||
+        event.recurrence === "hourly" ||
+        event.recurrence === "90_min"
+      ) {
+        let stepMs = 60000
+        if (event.recurrence === "15_min") stepMs = 15 * 60000
+        else if (event.recurrence === "30_min") stepMs = 30 * 60000
+        else if (event.recurrence === "hourly") stepMs = 60 * 60000
+        else if (event.recurrence === "90_min") stepMs = 90 * 60000
+        
+        const gapMs = rangeStart.getTime() - baseStart.getTime()
+        if (gapMs > stepMs) n = Math.floor(gapMs / stepMs) - 1
+      } else {
+        const step = event.recurrence === "daily" ? 1 : 7
+        const gap = differenceInCalendarDays(rangeStart, baseStart)
+        if (gap > step) n = Math.floor(gap / step) - 1
+      }
     }
     for (let guard = 0; guard < 1000; guard++, n++) {
       const start = stepRecurrence(baseStart, event.recurrence, n)
@@ -106,6 +141,11 @@ export function occursOn(anchor: string, recurrence: Recurrence, date: string): 
   const d = fromDateString(date)
   if (isBefore(d, a)) return false
   switch (recurrence) {
+    case "minutely":
+    case "15_min":
+    case "30_min":
+    case "hourly":
+    case "90_min":
     case "daily":
       return true
     case "weekly":
@@ -114,5 +154,7 @@ export function occursOn(anchor: string, recurrence: Recurrence, date: string): 
       return a.getDate() === d.getDate()
     case "yearly":
       return a.getDate() === d.getDate() && a.getMonth() === d.getMonth()
+    default:
+      return false
   }
 }

@@ -33,6 +33,11 @@ export const PRIORITY_META: Record<
 
 export const RECURRENCE_LABEL: Record<Task["recurrence"], string> = {
   none: "Doesn't repeat",
+  minutely: "Minutely",
+  "15_min": "Every 15 min",
+  "30_min": "Every 30 min",
+  hourly: "Hourly",
+  "90_min": "Every 1.5 hours",
   daily: "Daily",
   weekly: "Weekly",
   monthly: "Monthly",

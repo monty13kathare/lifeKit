@@ -24,6 +24,11 @@ export const VIEW_ITEMS: { value: CalendarView; label: string }[] = [
 
 export const RECURRENCE_ITEMS: { value: Recurrence; label: string }[] = [
   { value: "none", label: "Doesn't repeat" },
+  { value: "minutely", label: "Every minute" },
+  { value: "15_min", label: "Every 15 min" },
+  { value: "30_min", label: "Every 30 min" },
+  { value: "hourly", label: "Every hour" },
+  { value: "90_min", label: "Every 1.5 hours" },
   { value: "daily", label: "Every day" },
   { value: "weekly", label: "Every week" },
   { value: "monthly", label: "Every month" },

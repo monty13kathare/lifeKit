@@ -7,6 +7,16 @@ export function describeRepeat(r: Pick<Reminder, "repeat" | "date" | "time">): s
   if (r.repeat === "none") return null
   const anchor = combineDateTime(r.date, r.time)
   switch (r.repeat) {
+    case "minutely":
+      return "Repeats every minute"
+    case "15_min":
+      return "Repeats every 15 min"
+    case "30_min":
+      return "Repeats every 30 min"
+    case "hourly":
+      return "Repeats every hour"
+    case "90_min":
+      return "Repeats every 1.5 hours"
     case "daily":
       return "Repeats every day"
     case "weekly":

@@ -51,6 +51,15 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
   const [autoPlay, setAutoPlay] = useState(false)
   const voice = useReadAloud(lang)
   const scrollRef = useRef<HTMLDivElement>(null)
+  
+  const autoPlayRef = useRef(autoPlay)
+  autoPlayRef.current = autoPlay
+  const timerRef = useRef<number | null>(null)
+  
+  const clearTimer = () => {
+    if (timerRef.current) window.clearTimeout(timerRef.current)
+    timerRef.current = null
+  }
 
   const atEnd = index === total
   const page: StoryPage | undefined = story.pages[index]
@@ -73,36 +82,43 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
     if (clamped === total) haptic([30, 50, 30])
   }
 
-  const readPage = (i: number) => {
+  const readPage = (i: number, immediate = false) => {
     const p = story.pages[i]
     if (!p) { setAutoPlay(false); return }
-    voice.speak(p.text, {
-      rate: SPEED_RATES[speedIdx],
-      onEnd: () => {
-        window.setTimeout(() => {
-          setDir(1)
-          setIndex(i + 1)
-          if (i + 1 < total) readPage(i + 1)
-          else setAutoPlay(false)
-        }, 900)
-      },
-    })
+    
+    clearTimer()
+    timerRef.current = window.setTimeout(() => {
+      if (!autoPlayRef.current && !immediate) return
+      voice.speak(p.text, {
+        rate: SPEED_RATES[speedIdx],
+        onEnd: () => {
+          timerRef.current = window.setTimeout(() => {
+            setDir(1)
+            setIndex(i + 1)
+            if (i + 1 < total) readPage(i + 1, false)
+            else setAutoPlay(false)
+          }, 900)
+        },
+      })
+    }, immediate ? 50 : 600)
   }
 
   const toggleRead = () => {
     if (voice.speaking || autoPlay) {
       voice.stop()
       setAutoPlay(false)
+      clearTimer()
       return
     }
     const start = atEnd ? 0 : index
     if (atEnd) { setDir(-1); setIndex(0) }
     setAutoPlay(true)
-    readPage(start)
+    autoPlayRef.current = true
+    readPage(start, true)
   }
 
   const turn = (next: number) => {
-    if (voice.speaking || autoPlay) { voice.stop(); setAutoPlay(false) }
+    if (voice.speaking || autoPlay) { voice.stop(); setAutoPlay(false); clearTimer() }
     go(next)
   }
 

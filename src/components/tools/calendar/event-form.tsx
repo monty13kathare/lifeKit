@@ -33,7 +33,7 @@ const schema = z
     color: z.enum(EVENT_COLOR_KEYS as [EventColor, ...EventColor[]]),
     location: z.string().max(200, "Keep the location under 200 characters"),
     notes: z.string().max(2000, "Notes are limited to 2000 characters"),
-    recurrence: z.enum(["none", "daily", "weekly", "monthly", "yearly"]),
+    recurrence: z.enum(["none", "minutely", "15_min", "30_min", "hourly", "90_min", "daily", "weekly", "monthly", "yearly"]),
     recurrenceUntil: z.string(),
     alert: z.string().regex(/^(none|d{1,5})$/),
   })

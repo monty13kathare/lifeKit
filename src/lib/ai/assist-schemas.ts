@@ -21,7 +21,7 @@ export const aiTaskSchema = z.object({
   dueDate: optDate,
   dueTime: optTime,
   category: z.string().max(40).optional(),
-  recurrence: z.enum(["none", "daily", "weekly", "monthly"]),
+  recurrence: z.enum(["none", "minutely", "15_min", "30_min", "hourly", "90_min", "daily", "weekly", "monthly"]),
   subtasks: z.array(z.string().min(1).max(200)).max(12).optional(),
 })
 
@@ -33,7 +33,7 @@ export const aiEventSchema = z.object({
   allDay: z.boolean(),
   location: z.string().max(200).optional(),
   notes: z.string().max(2000).optional(),
-  recurrence: z.enum(["none", "daily", "weekly", "monthly", "yearly"]),
+  recurrence: z.enum(["none", "minutely", "15_min", "30_min", "hourly", "90_min", "daily", "weekly", "monthly", "yearly"]),
   /** -1 = no alert */
   alertMinutes: z.number().int().min(-1).max(1440).optional(),
 })
@@ -42,7 +42,7 @@ export const aiReminderSchema = z.object({
   title: z.string().min(1).max(200),
   date,
   time,
-  repeat: z.enum(["none", "daily", "weekly", "monthly"]),
+  repeat: z.enum(["none", "minutely", "15_min", "30_min", "hourly", "90_min", "daily", "weekly", "monthly"]),
   notes: z.string().max(2000).optional(),
 })
 

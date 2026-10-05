@@ -10,7 +10,7 @@ export interface EncryptedPayload {
   iterations?: number
 }
 
-export type Recurrence = "none" | "daily" | "weekly" | "monthly" | "yearly"
+export type Recurrence = "none" | "minutely" | "15_min" | "30_min" | "hourly" | "90_min" | "daily" | "weekly" | "monthly" | "yearly"
 
 /* ------------------------------------------------------------------ Tasks */
 

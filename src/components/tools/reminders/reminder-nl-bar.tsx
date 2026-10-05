@@ -73,7 +73,7 @@ export function ReminderNlBar({ onSave, onEdit }: ReminderNlBarProps) {
   return (
     <section
       aria-label="Create a reminder from a sentence"
-      className="space-y-3 rounded-2xl border bg-card p-3 shadow-soft sm:p-4"
+      className="space-y-0 rounded-2xl border bg-card shadow-soft transition-shadow focus-within:shadow-md"
       onKeyDown={(e) => {
         if (e.key === "Escape" && (preview || busy)) {
           e.preventDefault()
@@ -82,7 +82,7 @@ export function ReminderNlBar({ onSave, onEdit }: ReminderNlBarProps) {
       }}
     >
       <form
-        className="flex gap-2"
+        className="flex items-center gap-2 p-2 sm:p-2.5"
         onSubmit={(e) => {
           e.preventDefault()
           void parse()
@@ -91,31 +91,28 @@ export function ReminderNlBar({ onSave, onEdit }: ReminderNlBarProps) {
         <label htmlFor="reminder-nl-input" className="sr-only">
           Remind me to…
         </label>
-        <div className="relative min-w-0 flex-1">
-          <Sparkles className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary" aria-hidden />
+        <div className="relative min-w-0 flex-1 flex items-center">
+          <Sparkles className="absolute left-3 size-5 text-primary/60" aria-hidden />
           <Input
             ref={inputRef}
             id="reminder-nl-input"
             value={text}
             onChange={(e) => setText(e.target.value.slice(0, INPUT_MAX))}
             maxLength={INPUT_MAX}
-            placeholder="Remind me to… call mum tomorrow at 6pm"
+            placeholder="Type 'remind me to call mum tomorrow at 6pm'..."
             autoComplete="off"
             enterKeyHint="go"
-            aria-describedby="reminder-nl-hint"
-            className="h-11 pl-9"
+            className="h-12 border-0 bg-transparent pl-11 text-base shadow-none focus-visible:ring-0"
           />
         </div>
-        <Button type="submit" className="h-11 shrink-0" disabled={!text.trim() || busy}>
-          {busy ? <LoaderCircle className="animate-spin" aria-hidden /> : <Sparkles aria-hidden />}
-          <span className="sr-only sm:not-sr-only">{busy ? "Reading…" : "Preview"}</span>
+        <Button type="submit" size="sm" className="h-10 shrink-0 rounded-xl px-4" disabled={!text.trim() || busy}>
+          {busy ? <LoaderCircle className="animate-spin" aria-hidden /> : <Sparkles aria-hidden className="mr-1.5 size-4" />}
+          <span className="hidden sm:inline">{busy ? "Thinking…" : "Create"}</span>
         </Button>
       </form>
-      <p id="reminder-nl-hint" className="text-xs text-muted-foreground">
-        Sent to Google Gemini. You&apos;ll confirm before anything is saved.
-      </p>
 
-      <div aria-live="polite">
+      {(preview || busy) && (
+        <div className="border-t bg-surface-muted/30 p-4 rounded-b-2xl" aria-live="polite">
         {busy ? (
           <p className="flex items-center gap-2 rounded-xl bg-surface-muted p-3 text-sm text-muted-foreground">
             <LoaderCircle className="size-4 animate-spin" aria-hidden /> Reading your reminder…
@@ -174,7 +171,8 @@ export function ReminderNlBar({ onSave, onEdit }: ReminderNlBarProps) {
             </div>
           </div>
         ) : null}
-      </div>
+        </div>
+      )}
     </section>
   )
 }

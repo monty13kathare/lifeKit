@@ -7,6 +7,23 @@ export function latestOccurrence(r: Reminder, now = new Date()): Date | null {
   const anchor = combineDateTime(r.date, r.time)
   if (anchor > now) return null
   if (r.repeat === "none") return anchor
+  if (
+    r.repeat === "minutely" ||
+    r.repeat === "15_min" ||
+    r.repeat === "30_min" ||
+    r.repeat === "hourly" ||
+    r.repeat === "90_min"
+  ) {
+    let msStep = 60000
+    if (r.repeat === "15_min") msStep = 15 * 60000
+    else if (r.repeat === "30_min") msStep = 30 * 60000
+    else if (r.repeat === "hourly") msStep = 60 * 60000
+    else if (r.repeat === "90_min") msStep = 90 * 60000
+    
+    const msDiff = now.getTime() - anchor.getTime()
+    const n = Math.floor(msDiff / msStep)
+    return new Date(anchor.getTime() + n * msStep)
+  }
   if (r.repeat === "daily" || r.repeat === "weekly") {
     const step = r.repeat === "daily" ? 1 : 7
     const days = differenceInCalendarDays(now, anchor)
@@ -37,7 +54,12 @@ export function nextOccurrence(r: Reminder, now = new Date()): Date | null {
   if (r.repeat === "none") return null
   const latest = latestOccurrence(r, now) ?? anchor
   const next = new Date(latest)
-  if (r.repeat === "daily") next.setDate(next.getDate() + 1)
+  if (r.repeat === "minutely") next.setTime(next.getTime() + 60_000)
+  else if (r.repeat === "15_min") next.setTime(next.getTime() + 15 * 60_000)
+  else if (r.repeat === "30_min") next.setTime(next.getTime() + 30 * 60_000)
+  else if (r.repeat === "hourly") next.setTime(next.getTime() + 60 * 60_000)
+  else if (r.repeat === "90_min") next.setTime(next.getTime() + 90 * 60_000)
+  else if (r.repeat === "daily") next.setDate(next.getDate() + 1)
   else if (r.repeat === "weekly") next.setDate(next.getDate() + 7)
   else return addMonths(latest, 1)
   return next

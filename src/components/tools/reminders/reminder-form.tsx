@@ -19,7 +19,7 @@ const schema = z.object({
   title: z.string().trim().min(1, "What should we remind you about?").max(120, "Keep it under 120 characters"),
   date: z.string().min(1, "Pick a date"),
   time: z.string().regex(/^\d{2}:\d{2}$/, "Pick a time"),
-  repeat: z.enum(["none", "daily", "weekly", "monthly"]),
+  repeat: z.enum(["none", "minutely", "15_min", "30_min", "hourly", "90_min", "daily", "weekly", "monthly"]),
   notes: z.string().max(1000, "Notes are limited to 1000 characters"),
 })
 
@@ -28,6 +28,11 @@ export type ReminderDraft = Pick<Reminder, "title" | "date" | "time" | "repeat" 
 
 export const REPEAT_ITEMS: { value: Reminder["repeat"]; label: string }[] = [
   { value: "none", label: "Doesn't repeat" },
+  { value: "minutely", label: "Every minute" },
+  { value: "15_min", label: "Every 15 min" },
+  { value: "30_min", label: "Every 30 min" },
+  { value: "hourly", label: "Every hour" },
+  { value: "90_min", label: "Every 1.5 hours" },
   { value: "daily", label: "Every day" },
   { value: "weekly", label: "Every week" },
   { value: "monthly", label: "Every month" },

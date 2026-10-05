@@ -224,7 +224,7 @@ export function RemindersApp() {
         </Button>
       }
     >
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="mx-auto max-w-3xl space-y-8">
         <div className="min-w-0 space-y-6">
           <ReminderNlBar onSave={saveParsed} onEdit={editParsed} />
           {hydrated && reminders.length > 0 ? (
@@ -338,11 +338,9 @@ export function RemindersApp() {
           )}
         </div>
 
-        <aside className="order-first lg:order-none">
-          <div className="lg:sticky lg:top-6">
-            <NotificationCard />
-          </div>
-        </aside>
+        <div className="pt-8">
+          <NotificationCard />
+        </div>
       </div>
 
       <Button

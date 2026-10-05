@@ -26,7 +26,7 @@ const schema = z
     dueDate: z.string(),
     dueTime: z.string(),
     category: z.string().trim().min(1, "Choose or type a category").max(40, "Keep categories under 40 characters"),
-    recurrence: z.enum(["none", "daily", "weekly", "monthly"]),
+    recurrence: z.enum(["none", "minutely", "15_min", "30_min", "hourly", "90_min", "daily", "weekly", "monthly"]),
   })
   .superRefine((v, ctx) => {
     if (v.dueTime && !v.dueDate) ctx.addIssue({ code: "custom", path: ["dueDate"], message: "Add a due date for this time" })
