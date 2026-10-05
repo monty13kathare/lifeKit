@@ -82,3 +82,32 @@ function toAiError(err: unknown): AiError {
   console.error("[gemini] unexpected error", err)
   return new AiError("Something went wrong while contacting Gemini.", 500)
 }
+
+/** Image model for story illustrations; override with GEMINI_IMAGE_MODEL in .env. */
+export const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL?.trim() || "gemini-2.5-flash-image"
+
+/** Generate one image from a text prompt. Returns base64 data and its MIME type. */
+export async function generateImage({ prompt, signal }: { prompt: string; signal?: AbortSignal }): Promise<{ data: string; mimeType: string }> {
+  if (!isGeminiConfigured()) {
+    throw new AiError("Gemini isn't configured. Add GEMINI_API_KEY to the .env file and restart the server.", 503)
+  }
+  try {
+    const response = await getClient().models.generateContent({
+      model: GEMINI_IMAGE_MODEL,
+      contents: prompt,
+      config: { responseModalities: ["IMAGE"], abortSignal: signal },
+    })
+    const part = response.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)
+    if (!part?.inlineData?.data) throw new AiError("Gemini didn't return a picture. Try again.", 502)
+    return { data: part.inlineData.data, mimeType: part.inlineData.mimeType || "image/png" }
+  } catch (err) {
+    // Free-tier keys have zero image quota ("limit: 0"): say so instead of "try again later".
+    if (err instanceof ApiError && err.status === 429 && /limit:\s*0\b/.test(err.message)) {
+      throw new AiError("Real pictures need a Gemini API key with image generation enabled (a paid plan). The drawn pictures still work.", 403)
+    }
+    if (err instanceof ApiError && err.status === 404) {
+      throw new AiError(`The image model "${GEMINI_IMAGE_MODEL}" isn't available for this API key. Set GEMINI_IMAGE_MODEL in .env.`, 502)
+    }
+    throw toAiError(err)
+  }
+}

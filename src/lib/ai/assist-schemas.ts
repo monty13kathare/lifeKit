@@ -11,6 +11,9 @@ const optDate = z.union([date, z.literal("")]).optional()
 const optTime = z.union([time, z.literal("")]).optional()
 const color = z.enum(["indigo", "sky", "emerald", "amber", "rose", "violet", "slate"])
 
+/** Backdrops Story Mode can draw for a page. */
+export const STORY_SETTINGS = ["forest", "jungle", "village", "farm", "city", "market", "home", "school", "palace", "garden", "river", "sea", "mountain", "desert", "space"] as const
+
 export const aiTaskSchema = z.object({
   title: z.string().min(1).max(200),
   notes: z.string().max(2000).optional(),
@@ -274,6 +277,30 @@ export const ASSIST_OUTPUT = {
       .max(4),
     summary: z.array(z.string().max(250)).min(2).max(6),
     nextTopics: z.array(z.string().max(80)).max(4),
+  }),
+  /** Input JSON: { theme, idea?, age, pages, language } — an illustrated picture-book story. */
+  "story-book": z.object({
+    title: z.string().min(1).max(120),
+    moral: z.string().max(300),
+    pages: z
+      .array(
+        z.object({
+          text: z.string().min(1).max(900),
+          scene: z.object({
+            setting: z.enum(STORY_SETTINGS),
+            time: z.enum(["morning", "day", "evening", "night"]),
+            weather: z.enum(["clear", "cloudy", "rain"]),
+            mood: z.enum(["happy", "calm", "exciting", "tense", "sad"]),
+            /** 1–3 characters on the page as single emoji (🦊, 👦, 👑…). */
+            characters: z.array(z.string().min(1).max(16)).max(3),
+            props: z.array(z.string().min(1).max(16)).max(3),
+          }),
+          /** English description of the page's picture for the image model. */
+          imagePrompt: z.string().min(3).max(500),
+        })
+      )
+      .min(4)
+      .max(14),
   }),
   /** Input JSON: { subject, topic, lessonTitle, keyIdeas: string[], question, language } — a doubt about a lesson. */
   "learn-ask": z.object({

@@ -22,6 +22,7 @@ import {
   funQuizSetsStore,
   funStatsStore,
   learnLessonsStore,
+  storiesStore,
 } from "@/lib/storage"
 import type { HealthProfile, Settings } from "@/types"
 
@@ -136,4 +137,9 @@ export function useLearnFun() {
 export function useLessons() {
   const lessons = useStore(learnLessonsStore)
   return { lessons, ...pickMutations(learnLessonsStore) }
+}
+
+export function useStories() {
+  const stories = useStore(storiesStore)
+  return { stories, ...pickMutations(storiesStore) }
 }

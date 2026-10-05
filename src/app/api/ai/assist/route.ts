@@ -10,7 +10,7 @@ const bodySchema = z.object({
 })
 
 /** Jobs that benefit from more varied, creative output. */
-const CREATIVE = new Set<AssistKind>(["plan-day", "routine", "write", "goal-plan", "prompt-run", "english-quiz", "fun-quiz", "logic-puzzle", "decision-advice", "health-insights", "health-plan", "learn-lesson"])
+const CREATIVE = new Set<AssistKind>(["plan-day", "routine", "write", "goal-plan", "prompt-run", "english-quiz", "fun-quiz", "logic-puzzle", "decision-advice", "health-insights", "health-plan", "learn-lesson", "story-book"])
 
 const DATE_RULES =
   "Resolve relative dates and times (today, tomorrow, next Friday, tonight, in 2 hours) against the user's current local date-time given below. " +
@@ -117,6 +117,14 @@ const INSTRUCTIONS: Record<AssistKind, string> = {
     "Match depth to the level: beginner = very simple words and small numbers; advanced = deeper rules and harder examples. Be accurate — for facts, grammar and maths double-check every example and answer. " +
     "If simpler is true, the learner found the last explanation hard: use even simpler words, shorter sentences, smaller numbers and more everyday comparisons. " +
     "If the topic is unsafe or unsuitable for a learning app, teach a closely related safe topic instead.",
+  "story-book":
+    "You are a gifted children's author writing an illustrated picture-book story. Input JSON: theme (e.g. Panchatantra, Akbar–Birbal, adventure, mystery, space, friendship, funny, custom), " +
+    "optional idea from the reader, age group and the number of pages. Write an ORIGINAL, engaging story with a clear beginning, a problem, a turning point and a satisfying ending, " +
+    "with named characters, a little dialogue and gentle humour. Exactly the requested number of pages; each page 2–5 short sentences (shorter for young readers). " +
+    "For every page fill scene: setting (pick the closest backdrop), time of day, weather, mood, 1–3 characters as single emoji that stay CONSISTENT across pages " +
+    "(the same character always uses the same emoji, e.g. 🦊 for the fox, 👦 for Raju) and up to 3 prop emoji for important objects; " +
+    "and imagePrompt: an English one-to-two sentence description of the picture for an illustrator (characters' look, action, place), consistent across pages. " +
+    "End with a one-line moral. Keep it wholesome, kind and suitable for all ages; if the idea is unsuitable, write a gentle story on the theme instead.",
   "learn-ask":
     "You are a patient teacher answering a learner's doubt about the lesson described in the input JSON. Give a clear, simple answer (≤ 150 words) that builds on the lesson's ideas, " +
     "and one short easy example that makes it click. If the question is off-topic, answer briefly if it's a reasonable learning question, otherwise say you can help with this lesson's topic.",
@@ -142,7 +150,7 @@ const INSTRUCTIONS: Record<AssistKind, string> = {
 }
 
 /** Jobs whose JSON is long (several questions, possibly bilingual). */
-const MAX_OUTPUT_TOKENS: Partial<Record<AssistKind, number>> = { "fun-quiz": 8192, "health-plan": 8192, "learn-lesson": 8192 }
+const MAX_OUTPUT_TOKENS: Partial<Record<AssistKind, number>> = { "fun-quiz": 8192, "health-plan": 8192, "learn-lesson": 8192, "story-book": 8192 }
 
 /** Structured AI help for the My Life tools (parse, capture, subtasks, routine, extract, plan). */
 export async function POST(request: Request) {
@@ -261,6 +269,7 @@ function languageRule(kind: AssistKind, lang: "en" | "hi", input: string): strin
       return funQuizLanguageRule(input)
     case "learn-lesson":
     case "learn-ask":
+    case "story-book":
       return lessonLanguageRule(input)
     case "logic-puzzle":
       return lang === "hi"

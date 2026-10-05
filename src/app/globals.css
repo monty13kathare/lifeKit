@@ -257,3 +257,29 @@ nextjs-portal,
 @utility animate-lk-glow {
   animation: lk-glow 2.4s ease-in-out infinite;
 }
+
+/* ---------------------------------------------------------- Story Mode */
+@keyframes lk-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes lk-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(14px); }
+}
+@keyframes lk-rain {
+  from { background-position: 0 0; }
+  to { background-position: -40px 160px; }
+}
+@utility animate-lk-bob {
+  animation: lk-bob 2.6s ease-in-out infinite;
+}
+@utility animate-lk-drift {
+  animation: lk-drift 9s ease-in-out infinite;
+}
+.lk-rain {
+  background-image: repeating-linear-gradient(105deg, transparent 0 10px, rgba(200, 225, 255, 0.55) 10px 11px, transparent 11px 22px);
+  background-size: 40px 160px;
+  animation: lk-rain 0.6s linear infinite;
+  opacity: 0.7;
+}

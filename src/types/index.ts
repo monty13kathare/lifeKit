@@ -412,3 +412,38 @@ export interface LearnLesson {
   score?: number
   data: LessonContent
 }
+
+/* ------------------------------------------------------------ Story Mode */
+
+export type StorySetting =
+  | "forest" | "jungle" | "village" | "farm" | "city" | "market" | "home" | "school"
+  | "palace" | "garden" | "river" | "sea" | "mountain" | "desert" | "space"
+
+export interface StoryScene {
+  setting: StorySetting
+  time: "morning" | "day" | "evening" | "night"
+  weather: "clear" | "cloudy" | "rain"
+  mood: "happy" | "calm" | "exciting" | "tense" | "sad"
+  /** Single emoji per character, consistent across pages. */
+  characters: string[]
+  props: string[]
+}
+
+export interface StoryPage {
+  text: string
+  scene: StoryScene
+  imagePrompt: string
+  /** AI illustration (compressed JPEG data URL), when the reader asked for one. */
+  imageUrl?: string
+}
+
+/** An illustrated Story Mode book. */
+export interface StoryBook {
+  id: string
+  title: string
+  moral: string
+  theme: string
+  language: AiLanguage
+  createdAt: ISODateTime
+  pages: StoryPage[]
+}
