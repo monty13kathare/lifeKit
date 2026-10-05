@@ -55,7 +55,7 @@ export function ImageToPdfTool() {
   const urls = useObjectUrls()
   const [items, setItems] = useState<PdfItem[]>([])
   const [pageSize, setPageSize] = useState<PageSize>("a4")
-  const [orientation, setOrientation] = useState<PageOrientation>("auto")
+  const [orientation, setOrientation] = useState<PageOrientation>("portrait")
   const [margin, setMargin] = useState<PageMargin>("small")
   const [fileName, setFileName] = useState("images")
   const [busy, setBusy] = useState(false)
