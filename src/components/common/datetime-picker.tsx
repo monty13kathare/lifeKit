@@ -98,8 +98,8 @@ export function DateTimePicker({ value, onChange, disabled, minDate, maxDate, id
             <div className="p-3 font-medium text-xs text-muted-foreground flex items-center gap-1.5 border-b border-border">
               <Clock className="size-3.5" aria-hidden /> Time
             </div>
-            <div className="flex h-[280px]">
-              <ScrollArea className="w-16 border-r border-border">
+            <div className="flex h-[160px] w-full sm:h-[280px] sm:w-auto">
+              <ScrollArea className="flex-1 sm:w-16 border-r border-border">
                 <div className="flex flex-col p-1">
                   {Array.from({ length: 24 }).map((_, i) => {
                     const h = i.toString().padStart(2, "0")
@@ -120,7 +120,7 @@ export function DateTimePicker({ value, onChange, disabled, minDate, maxDate, id
                   })}
                 </div>
               </ScrollArea>
-              <ScrollArea className="w-16">
+              <ScrollArea className="flex-1 sm:w-16">
                 <div className="flex flex-col p-1">
                   {Array.from({ length: 60 }).map((_, i) => {
                     const m = i.toString().padStart(2, "0")
