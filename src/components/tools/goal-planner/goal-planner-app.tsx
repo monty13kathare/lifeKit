@@ -151,11 +151,7 @@ export function GoalPlannerApp() {
         />
       ) : (
         <div className="space-y-4">
-          {goals.length > 0 ? (
-            <Button size="lg" className="w-full sm:hidden" onClick={() => setForm({ open: true })}>
-              <Plus aria-hidden /> New goal
-            </Button>
-          ) : null}
+
 
           {goals.length === 0 ? (
             <EmptyState
@@ -226,6 +222,17 @@ export function GoalPlannerApp() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {!openGoal && goals.length > 0 ? (
+        <Button
+          size="icon-lg"
+          aria-label="New goal"
+          onClick={() => setForm({ open: true })}
+          className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 rounded-full shadow-lg sm:hidden lg:bottom-8"
+        >
+          <Plus className="size-6" aria-hidden />
+        </Button>
+      ) : null}
     </ToolPage>
   )
 }

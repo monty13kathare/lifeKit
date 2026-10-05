@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
 import { Eraser, LoaderCircle, Sparkles, X } from "lucide-react"
 import { toast } from "sonner"
 import { Notice } from "@/components/common/notice"
@@ -198,18 +199,25 @@ export function Summarizer() {
 
         <div className="space-y-2">
           <Label htmlFor="summary-note">Or summarize a note</Label>
-          <Select items={noteItems} value={noteId} onValueChange={(v) => onPickNote(v as string | null)} disabled={!hydrated || !noteItems.length || busy}>
-            <SelectTrigger id="summary-note" className="w-full sm:max-w-md">
-              <SelectValue placeholder={hydrated && !noteItems.length ? "No notes yet" : "Pick a note"} />
-            </SelectTrigger>
-            <SelectContent>
-              {noteItems.map((n) => (
-                <SelectItem key={n.value} value={n.value}>
-                  {n.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Select items={noteItems} value={noteId} onValueChange={(v) => onPickNote(v as string | null)} disabled={!hydrated || !noteItems.length || busy}>
+              <SelectTrigger id="summary-note" className="w-full sm:max-w-md">
+                <SelectValue placeholder={hydrated && !noteItems.length ? "No notes yet" : "Pick a note"} />
+              </SelectTrigger>
+              <SelectContent>
+                {noteItems.map((n) => (
+                  <SelectItem key={n.value} value={n.value}>
+                    {n.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {hydrated && noteItems.length === 0 ? (
+              <Button variant="link" className="h-auto px-1 py-1 text-muted-foreground sm:h-9" nativeButton={false} render={<Link href="/tools/notes" />}>
+                Create a note
+              </Button>
+            ) : null}
+          </div>
         </div>
 
         <div className="rounded-2xl border bg-card p-4 shadow-soft">
