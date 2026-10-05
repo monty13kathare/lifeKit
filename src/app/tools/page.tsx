@@ -13,7 +13,7 @@ export default function ToolsPage() {
       </header>
 
       <nav aria-label="Tool categories" className="-mx-4 mb-6 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0">
-        <ul className="flex gap-2">
+        <ul className="flex gap-2 after:content-[''] after:w-px after:shrink-0 after:pr-4 sm:after:hidden">
           {TOOL_CATEGORY_ORDER.map((c) => (
             <li key={c}>
               <a
@@ -36,17 +36,13 @@ export default function ToolsPage() {
               </h2>
               <p className="text-sm text-muted-foreground">{CATEGORY_META[category].description}</p>
             </div>
-            {/* Rows on phones, tiles from tablet up */}
-            <div className="grid grid-cols-1 gap-2.5 sm:hidden">
+            <ul className="no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1 after:content-[''] after:w-px after:shrink-0 after:pr-4 sm:after:hidden sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-3 sm:overflow-visible sm:px-0 lg:grid-cols-3 xl:grid-cols-4">
               {toolsByCategory(category).map((tool) => (
-                <ToolCard key={tool.id} tool={tool} variant="row" />
+                <li key={tool.id} className="w-40 shrink-0 snap-start sm:w-auto">
+                  <ToolCard tool={tool} />
+                </li>
               ))}
-            </div>
-            <div className="hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {toolsByCategory(category).map((tool) => (
-                <ToolCard key={tool.id} tool={tool} />
-              ))}
-            </div>
+            </ul>
           </section>
         ))}
       </div>

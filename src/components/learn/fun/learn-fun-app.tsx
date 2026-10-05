@@ -59,7 +59,7 @@ export function LearnFunApp() {
   /** Recently asked questions per category, so "New questions" doesn't repeat them. */
   const recentRef = useRef(new Map<string, string[]>())
 
-  const maxCount = lang === "both" ? 5 : 10
+  const maxCount = 10
   const level = levelInfo(stats.xp)
   const accuracy = stats.answered ? Math.round((stats.correct / stats.answered) * 100) : 0
 
@@ -117,7 +117,7 @@ export function LearnFunApp() {
         JSON.stringify({ category: cat ? cat.id : "custom (any subject the user chose)", topic, difficulty: s.difficulty, count, language: lang, avoid }),
         controller.signal
       )
-      const questions = out.questions.map((q) => shuffleOptions({ ...q, hindi: lang === "both" ? q.hindi : undefined }))
+      const questions = out.questions.map((q) => shuffleOptions({ ...q, hindi: undefined }))
       recentRef.current.set(s.category, [...questions.map((q) => q.question), ...(recentRef.current.get(s.category) ?? [])].slice(0, 15))
       setView({
         name: "play",
@@ -275,7 +275,7 @@ export function LearnFunApp() {
           <div className="flex items-center gap-2 sm:justify-between sm:gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
               <Languages className="hidden size-4 shrink-0 text-muted-foreground sm:block" aria-hidden />
-              <div role="radiogroup" aria-label="Quiz language" className="grid flex-1 grid-cols-3 rounded-xl bg-muted p-1 text-sm sm:flex sm:flex-none">
+              <div role="radiogroup" aria-label="Quiz language" className="grid flex-1 grid-cols-2 rounded-xl bg-muted p-1 text-sm sm:flex sm:flex-none">
                 {LANGUAGES.map((o) => (
                   <button
                     key={o.id}
@@ -289,7 +289,7 @@ export function LearnFunApp() {
                       lang === o.id ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    {o.id === "both" ? (<>Both<span className="hidden sm:inline"> · दोनों</span></>) : o.label}
+                    {o.label}
                   </button>
                 ))}
               </div>
@@ -364,11 +364,6 @@ export function LearnFunApp() {
                       </span>
                       <span className="font-semibold leading-tight">
                         {tr(lang, c.name)}
-                        {lang === "both" && (
-                          <span className="block text-sm font-normal text-muted-foreground" lang="hi">
-                            {c.name.hi}
-                          </span>
-                        )}
                       </span>
                       <span className="line-clamp-2 text-xs text-muted-foreground">{tr(lang, c.blurb)}</span>
                       {acc !== null && (
@@ -482,7 +477,6 @@ export function LearnFunApp() {
                     </Chip>
                   ))}
                 </div>
-                {lang === "both" && <p className="mt-1.5 text-xs text-muted-foreground">Bilingual quizzes have up to 5 questions.</p>}
               </Field>
             </div>
           )}

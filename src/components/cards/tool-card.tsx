@@ -60,16 +60,16 @@ export function ToolCard({ tool, variant = "tile", className }: ToolCardProps) {
     <Link
       href={tool.href}
       className={cn(
-        "group flex h-full flex-col gap-3 rounded-2xl border bg-card p-4 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-soft sm:p-5",
+        "group flex h-full flex-col gap-2.5 rounded-2xl border bg-card p-3 transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-soft sm:gap-3 sm:p-5",
         className
       )}
     >
-      <span className={cn("flex size-11 items-center justify-center rounded-xl", tool.accent)}>
-        <Icon className="size-5" aria-hidden />
+      <span className={cn("flex size-10 items-center justify-center rounded-xl sm:size-11", tool.accent)}>
+        <Icon className="size-4.5 sm:size-5" aria-hidden />
       </span>
-      <span>
-        <span className="block font-medium">{tool.name}</span>
-        <span className="mt-0.5 block text-sm leading-snug text-muted-foreground">{tool.description}</span>
+      <span className="flex-1">
+        <span className="block text-sm font-semibold sm:text-base sm:font-medium">{tool.name}</span>
+        <span className="mt-1 block line-clamp-2 text-xs leading-relaxed text-muted-foreground sm:line-clamp-none sm:mt-0.5 sm:text-sm sm:leading-snug">{tool.description}</span>
       </span>
     </Link>
   )

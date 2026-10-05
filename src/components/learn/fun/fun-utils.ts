@@ -18,7 +18,7 @@ export interface ActiveQuiz {
 export const tr = (lang: FunLanguage, text: Bilingual) => (lang === "hi" ? text.hi : text.en)
 
 /** "English · हिन्दी" style label for "both", otherwise one language. */
-export const label = (lang: FunLanguage, text: Bilingual) => (lang === "both" ? `${text.en} · ${text.hi}` : tr(lang, text))
+export const label = (lang: FunLanguage, text: Bilingual) => tr(lang, text)
 
 export const DIFFICULTIES: { id: FunDifficulty; name: Bilingual; emoji: string }[] = [
   { id: "easy", name: { en: "Easy", hi: "आसान" }, emoji: "🌱" },
@@ -29,5 +29,4 @@ export const DIFFICULTIES: { id: FunDifficulty; name: Bilingual; emoji: string }
 export const LANGUAGES: { id: FunLanguage; label: string; lang: string }[] = [
   { id: "en", label: "English", lang: "en" },
   { id: "hi", label: "हिन्दी", lang: "hi" },
-  { id: "both", label: "Both · दोनों", lang: "en" },
 ]

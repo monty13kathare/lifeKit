@@ -216,7 +216,7 @@ function ExploreTools() {
               <h3 className="font-semibold">{CATEGORY_META[cat].label}</h3>
               <p className="text-xs text-muted-foreground">{CATEGORY_META[cat].description}</p>
             </div>
-            <ul className="no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-4">
+            <ul className="no-scrollbar -mx-4 flex snap-x scroll-px-4 gap-2.5 overflow-x-auto px-4 pb-1 after:content-[''] after:w-px after:shrink-0 after:pr-4 sm:after:hidden sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-4">
               {tools.map((t) => (
                 <li key={t.id} className="w-40 shrink-0 snap-start sm:w-auto">
                   <Link href={t.href} className="flex h-full flex-col gap-2 rounded-2xl border bg-card p-3 transition-colors hover:border-primary/30 hover:bg-muted/40">

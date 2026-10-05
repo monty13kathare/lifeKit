@@ -410,7 +410,7 @@ const toText = (t: StarterText): FunQuestionText => ({ story: t.story, question:
 
 function pick(q: StarterQuestion, language: FunLanguage): FunQuestion {
   const main = language === "hi" ? q.hi : q.en
-  return { ...toText(main), hint: main.hint, answerIndex: q.answerIndex, hindi: language === "both" ? toText(q.hi) : undefined }
+  return { ...toText(main), hint: main.hint, answerIndex: q.answerIndex, hindi: undefined }
 }
 
 /** Starter questions for a category (or all categories mixed). */

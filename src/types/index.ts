@@ -323,7 +323,7 @@ export interface HealthInsight {
 
 /* ------------------------------------------------------- Learn with Fun */
 
-export type FunLanguage = "en" | "hi" | "both"
+export type FunLanguage = "en" | "hi"
 export type FunDifficulty = "easy" | "medium" | "hard"
 export type FunMode = "classic" | "timed" | "survival" | "study"
 
