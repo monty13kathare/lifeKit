@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Eraser, LoaderCircle, Sparkles, X } from "lucide-react"
 import { toast } from "sonner"
-import { FileDropzone } from "@/components/common/file-dropzone"
 import { Notice } from "@/components/common/notice"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -19,7 +18,6 @@ import { errorMessage, fitJsonPayload, isAbort } from "@/components/tools/ai-wri
 import { SummaryOutput } from "./summary-output"
 import {
   LENGTH_OPTIONS,
-  SUMMARY_FILE_MAX_BYTES,
   SUMMARY_TEXT_LIMIT,
   countWords,
   formatMinutes,
@@ -28,7 +26,6 @@ import {
   type SummaryLength,
 } from "./summary-utils"
 
-const FILE_ACCEPT = [".txt", ".md", ".markdown", "text/plain", "text/markdown"]
 
 export interface SummaryResult {
   id: number
@@ -78,37 +75,32 @@ export function Summarizer() {
     setSource(from)
   }
 
-  const onFile = async (files: File[]) => {
-    const file = files[0]
-    if (!file) return
-    try {
-      const content = await file.text()
-      if (!content.trim()) {
-        toast.error(`“${file.name}” is empty.`)
-        return
-      }
-      if (content.includes("\u0000")) {
-        toast.error(`“${file.name}” doesn't look like a text file.`)
-        return
-      }
-      setNoteId(null)
-      loadText(content, file.name)
-      toast.success(`Loaded “${file.name}” — read on your device`)
-    } catch {
-      toast.error(`Couldn't read “${file.name}”.`)
-    }
-  }
 
   const onPickNote = (id: string | null) => {
     setNoteId(id)
     const note = notes.find((n) => n.id === id)
     if (!note) return
     const content = [note.title.trim(), note.content.trim()].filter(Boolean).join("\n\n")
-    loadText(content, note.title.trim() || "Untitled note")
+    const title = note.title.trim() || "Untitled note"
+    
+    loadText(content, title)
+    
+    // Trigger summarize automatically with the new content
+    const truncated = content.slice(0, SUMMARY_TEXT_LIMIT)
+    if (truncated.trim().length > 0) {
+      // Use setTimeout to allow state (like source/noteId) to settle before UI blocks, 
+      // but pass the text directly.
+      setTimeout(() => void summarize(truncated, title), 0)
+    }
   }
 
-  const summarize = async () => {
-    if (!canSummarize) return
+  const summarize = async (overrideText?: string, overrideSource?: string) => {
+    const input = (overrideText ?? text).trim()
+    const currentWords = countWords(input)
+    
+    // Check if we can summarize this specific input
+    if (!configured || busy || currentWords === 0 || input.length > SUMMARY_TEXT_LIMIT) return
+    
     controller.current?.abort()
     const ctl = new AbortController()
     controller.current = ctl
@@ -117,13 +109,12 @@ export function Summarizer() {
     if (window.matchMedia("(max-width: 1023px)").matches) {
       requestAnimationFrame(() => outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }))
     }
-    const input = text.trim()
     const { json, trimmed } = fitJsonPayload((t) => ({ text: t, length }), input, SUMMARY_TEXT_LIMIT)
     if (trimmed) toast.info("Your text was trimmed slightly to fit the 40,000-character limit.")
     try {
       const summary = await aiAssist("summarize", json, ctl.signal)
       if (ctl.signal.aborted) return
-      setResult({ id: Date.now(), summary, inputWords: countWords(input), source })
+      setResult({ id: Date.now(), summary, inputWords: countWords(input), source: overrideSource ?? source })
     } catch (err) {
       if (isAbort(err) || ctl.signal.aborted) return
       const msg = errorMessage(err)
