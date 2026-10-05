@@ -103,7 +103,7 @@ export const TOOLS: Tool[] = [
   { id: "bg-remover", name: "Remove Background", description: "AI-powered background removal for any photo.", href: "/tools/bg-remover", icon: Eraser, category: "images", section: "tools", accent: A.sky },
 
   // Scan
-  { id: "scan", name: "Scan Everything", description: "One camera for QR, barcodes and text.", href: "/scan", icon: Scan, category: "scan", section: "tools", accent: A.indigo },
+  { id: "scan", name: "Scan Everything", description: "One camera for QR codes and barcodes.", href: "/scan", icon: Scan, category: "scan", section: "tools", accent: A.indigo },
   { id: "qr-generator", name: "QR Generator", description: "Create QR codes for links and content.", href: "/tools/qr-generator", icon: QrCode, category: "scan", section: "tools", accent: A.indigo },
 
   // AI Productivity

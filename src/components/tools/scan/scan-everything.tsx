@@ -2,21 +2,18 @@
 
 import { useCallback, useRef, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { ChevronRight, FileScan, ImageUp, Loader2, QrCode, ScanBarcode, ScanText, type LucideIcon } from "lucide-react"
+import { ChevronRight, FileScan, QrCode, ScanBarcode, ScanText, type LucideIcon } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { CameraScanner } from "@/components/tools/scanner/camera-scanner"
-import { CameraView } from "@/components/tools/scanner/camera-view"
 import { ImageScan } from "@/components/tools/scanner/image-scan"
 import { ScanHistory } from "@/components/tools/scanner/scan-history"
 import { ScanResultCard } from "@/components/tools/scanner/scan-result"
-import { useCamera, type CameraController } from "@/components/tools/scanner/use-camera"
 import { checkFile, MB } from "@/lib/files"
 import type { DetectedCode } from "@/lib/qr/detect"
 import { ALL_FORMATS, formatLabel } from "@/lib/qr/formats"
 import { parsePayload, PAYLOAD_LABELS } from "@/lib/qr/payload"
-import { scanHistory, setOcrHandoff } from "@/lib/qr/session"
+import { scanHistory } from "@/lib/qr/session"
 import { cn } from "@/lib/utils"
 
 const QUICK_LINKS: Array<{ href: string; label: string; description: string; icon: LucideIcon }> = [
@@ -25,11 +22,7 @@ const QUICK_LINKS: Array<{ href: string; label: string; description: string; ico
   { href: "/tools/qr-generator", label: "QR Generator", description: "Make your own", icon: QrCode },
 ]
 
-type Mode = "code" | "text"
-const MODES: Array<{ id: Mode; label: string; icon: LucideIcon }> = [
-  { id: "code", label: "QR & barcode", icon: ScanBarcode },
-  { id: "text", label: "Text", icon: ScanText },
-]
+
 
 interface Current {
   code: DetectedCode
@@ -37,19 +30,7 @@ interface Current {
   historyId?: string
 }
 
-/** Downscale a frame/photo into a JPEG data URL small enough for the OCR hand-off. */
-function handoffCanvas(canvasFor: (maxDim: number) => HTMLCanvasElement | null): boolean {
-  for (const [size, quality] of [
-    [2000, 0.9],
-    [1400, 0.75],
-    [1000, 0.6],
-  ] as const) {
-    const canvas = canvasFor(size)
-    if (!canvas) return false
-    if (setOcrHandoff(canvas.toDataURL("image/jpeg", quality))) return true
-  }
-  return false
-}
+
 
 function codeLabel(c: DetectedCode) {
   const p = parsePayload(c.value)
@@ -57,7 +38,6 @@ function codeLabel(c: DetectedCode) {
 }
 
 export function ScanEverything() {
-  const [mode, setMode] = useState<Mode>("code")
   const [current, setCurrent] = useState<Current | null>(null)
   const [found, setFound] = useState<DetectedCode[]>([])
   const resultRef = useRef<HTMLDivElement>(null)
@@ -92,46 +72,22 @@ export function ScanEverything() {
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-start">
       <div className="min-w-0 space-y-3">
-        <div role="radiogroup" aria-label="What to scan" className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
-          {MODES.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              role="radio"
-              aria-checked={mode === id}
-              onClick={() => setMode(id)}
-              className={cn(
-                "inline-flex h-10 items-center justify-center gap-2 rounded-lg text-sm font-medium transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
-                mode === id ? "bg-background text-foreground shadow-sm dark:bg-input/40" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Icon className="size-4" aria-hidden /> {label}
-            </button>
-          ))}
-        </div>
-
-        {mode === "code" ? (
-          <>
-            <CameraScanner
-              formats={ALL_FORMATS}
-              viewfinder="square"
-              idleTitle="Scan QR codes and barcodes"
-              idleDescription="Codes are detected automatically — links, Wi-Fi, contacts, events, UPI, product barcodes and more."
-              onDetect={(c) => handle(c, "camera")}
-              pausedLabel={codeLabel}
-            />
-            <ImageScan
-              formats={ALL_FORMATS}
-              compact
-              title="Scan a code from an image"
-              hint="Screenshot or photo"
-              onDetect={(c) => handle(c, "image")}
-              onDetectMany={handleMany}
-            />
-          </>
-        ) : (
-          <TextMode />
-        )}
+        <CameraScanner
+          formats={ALL_FORMATS}
+          viewfinder="square"
+          idleTitle="Scan QR codes and barcodes"
+          idleDescription="Codes are detected automatically — links, Wi-Fi, contacts, events, UPI, product barcodes and more."
+          onDetect={(c) => handle(c, "camera")}
+          pausedLabel={codeLabel}
+        />
+        <ImageScan
+          formats={ALL_FORMATS}
+          compact
+          title="Scan a code from an image"
+          hint="Screenshot or photo"
+          onDetect={(c) => handle(c, "image")}
+          onDetectMany={handleMany}
+        />
       </div>
 
       <div className="min-w-0 space-y-4">
@@ -211,96 +167,3 @@ export function ScanEverything() {
   )
 }
 
-/** Text mode: capture a camera frame or pick a photo and hand it to the OCR tool. */
-function TextMode() {
-  const router = useRouter()
-  const camera = useCamera()
-  const [busy, setBusy] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  const go = () => {
-    router.push("/tools/ocr")
-  }
-
-  const captureText = (cam: CameraController) => {
-    setBusy(true)
-    if (handoffCanvas((max) => cam.captureFrame(max))) {
-      cam.stop()
-      go()
-      return
-    }
-    setBusy(false)
-    toast.error("Couldn't capture this frame. Try a photo instead.")
-  }
-
-  const fromFile = async (file: File | undefined) => {
-    if (!file) return
-    const check = checkFile(file, { accept: ["image/*"], maxBytes: 25 * MB })
-    if (!check.ok) {
-      toast.error(check.error ?? "This file can't be read.")
-      return
-    }
-    setBusy(true)
-    try {
-      const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" })
-      const ok = handoffCanvas((max) => {
-        const k = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
-        const c = document.createElement("canvas")
-        c.width = Math.round(bitmap.width * k)
-        c.height = Math.round(bitmap.height * k)
-        const ctx = c.getContext("2d")
-        if (!ctx) return null
-        ctx.fillStyle = "#fff"
-        ctx.fillRect(0, 0, c.width, c.height)
-        ctx.drawImage(bitmap, 0, 0, c.width, c.height)
-        return c
-      })
-      bitmap.close()
-      if (ok) {
-        go()
-        return
-      }
-      toast.error("This image is too large to hand over. Open it in the OCR tool instead.")
-    } catch {
-      toast.error("This image couldn't be read. Try a JPG or PNG.")
-    }
-    setBusy(false)
-  }
-
-  return (
-    <div className="space-y-3">
-      <CameraView
-        camera={camera}
-        viewfinder="document"
-        idleTitle="Read printed text"
-        idleDescription="Point at a page, sign or label, then tap “Capture text”. Text is recognised in your browser."
-        toolbar={
-          <Button size="lg" className="h-11 rounded-full px-5" disabled={busy} onClick={() => captureText(camera)}>
-            {busy ? <Loader2 className="animate-spin" aria-hidden /> : <ScanText aria-hidden />} Capture text
-          </Button>
-        }
-      />
-      <div className="space-y-3 rounded-2xl border-2 border-dashed bg-surface p-4">
-        <div>
-          <p className="font-medium">Read text from a photo</p>
-          <p className="text-sm text-muted-foreground">Opens it in the OCR tool · JPG, PNG or WebP</p>
-        </div>
-        <Button variant="outline" className="w-full" disabled={busy} onClick={() => fileRef.current?.click()}>
-          {busy ? <Loader2 className="animate-spin" aria-hidden /> : <ImageUp aria-hidden />} Choose a photo
-        </Button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*"
-          aria-label="Choose a photo to read text from"
-          className="sr-only"
-          tabIndex={-1}
-          onChange={(e) => {
-            void fromFile(e.target.files?.[0])
-            e.target.value = ""
-          }}
-        />
-      </div>
-    </div>
-  )
-}
