@@ -397,9 +397,20 @@ export function ScanResultCard({ code, source, onDismiss, className }: ScanResul
         </ul>
       ) : null}
 
-      <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
-        <CopyButton value={code.value} label={payload.type === "url" ? "Copy link" : "Copy raw text"} />
-        <ShareButton text={code.value} />
+      <div className="mt-4 space-y-3 border-t pt-4">
+        {showPayload && payload.type !== "text" && payload.type !== "url" ? (
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Raw Data</p>
+            <p className="max-h-32 overflow-y-auto rounded-lg border bg-surface p-2 font-mono text-xs text-muted-foreground break-all whitespace-pre-wrap">
+              {code.value}
+            </p>
+          </div>
+        ) : null}
+        
+        <div className="flex flex-wrap gap-2">
+          <CopyButton value={code.value} label={payload.type === "url" ? "Copy link" : "Copy raw text"} />
+          <ShareButton text={code.value} />
+        </div>
       </div>
     </motion.section>
   )

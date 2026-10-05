@@ -46,14 +46,23 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 /** Render to a canvas at `style.size` pixels. Throws when data doesn't fit. */
 export async function renderQrCanvas(text: string, style: QrStyle, canvas: HTMLCanvasElement, logo?: QrLogo | null) {
   const QR = await loadQrLib()
-  await QR.toCanvas(canvas, text, {
+  
+  // Render exact-pixel modules to avoid subpixel aliasing gaps from `qrcode`'s width scaling
+  const temp = document.createElement("canvas")
+  await QR.toCanvas(temp, text, {
     errorCorrectionLevel: style.ecc,
     margin: style.margin,
-    width: style.size,
+    scale: 1,
     color: { dark: style.fg, light: style.bg },
   })
+
+  canvas.width = style.size
+  canvas.height = style.size
+  const ctx = canvas.getContext("2d")!
+  ctx.imageSmoothingEnabled = false
+  ctx.drawImage(temp, 0, 0, style.size, style.size)
+
   if (logo) {
-    const ctx = canvas.getContext("2d")!
     const { s, pad, x, y } = logoBox(canvas.width, style.logoRatio)
     ctx.fillStyle = style.bg
     roundRect(ctx, x - pad, y - pad, s + pad * 2, s + pad * 2, Math.round(s * 0.18))
