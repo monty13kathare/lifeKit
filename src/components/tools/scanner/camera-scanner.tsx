@@ -55,7 +55,7 @@ export function CameraScanner({
   useEffect(() => {
     if (camera.status !== "live" || decoderRef.current) return
     let cancelled = false
-    createDecoder(formatsKey.split(",") as CodeFormat[])
+    createDecoder(formatsKey.split(",") as CodeFormat[], { maxDim: 640 })
       .then((d) => {
         if (cancelled) return d.dispose()
         decoderRef.current = d
@@ -83,7 +83,7 @@ export function CameraScanner({
     if (camera.status !== "live" || hit || !engine) return
     let stopped = false
     let timer: ReturnType<typeof setTimeout>
-    const interval = engine === "native" ? 120 : 280
+    const interval = engine === "native" ? 120 : 400
     const tick = async () => {
       const video = camera.videoRef.current
       const decoder = decoderRef.current

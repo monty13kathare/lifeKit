@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function ScanPage() {
   return (
-    <ToolPage toolId="scan" width="wide" backHref="/tools" privacy="Scanned in your browser — nothing is uploaded">
+    <ToolPage toolId="scan" width="wide" backHref="/tools">
       <ScanEverything />
     </ToolPage>
   )

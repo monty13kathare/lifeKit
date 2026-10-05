@@ -1,13 +1,16 @@
 "use client"
 
 import { useId, useState } from "react"
-import { Eye, EyeOff, Loader2, LocateFixed } from "lucide-react"
+import { CalendarIcon, Clock, Eye, EyeOff, Loader2, LocateFixed } from "lucide-react"
+import { format as formatDate, parseISO } from "date-fns"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 import { Textarea } from "@/components/ui/textarea"
 import type { FormValues, QrContentType } from "@/lib/qr/generator"
 import { cn } from "@/lib/utils"
@@ -201,11 +204,48 @@ export function QrTypeForm({ type, values, errors, showErrors, onChange }: QrTyp
                   {showPassword ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
                 </Button>
               </div>
+            ) : f.kind === "date" ? (
+              <Popover>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      id={id}
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-surface transition-all",
+                        !value && "text-muted-foreground",
+                        err && "border-destructive text-destructive focus-visible:ring-destructive"
+                      )}
+                    />
+                  }
+                >
+                  <CalendarIcon className="mr-2 size-4 opacity-70" aria-hidden />
+                  {value && !isNaN(parseISO(String(value)).getTime()) ? formatDate(parseISO(String(value)), "PPP") : <span>Pick a date</span>}
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={value && !isNaN(parseISO(String(value)).getTime()) ? parseISO(String(value)) : undefined}
+                    onSelect={(d) => onChange(f.name, d ? formatDate(d, "yyyy-MM-dd") : "")}
+                  />
+                </PopoverContent>
+              </Popover>
+            ) : f.kind === "time" ? (
+              <div className="relative">
+                <Input
+                  {...common}
+                  type="time"
+                  className={cn("block min-w-0 pl-10 bg-surface", err && "border-destructive text-destructive focus-visible:ring-destructive")}
+                  value={String(value ?? "")}
+                  onChange={(e) => onChange(f.name, e.target.value)}
+                />
+                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 opacity-50 pointer-events-none" aria-hidden />
+              </div>
             ) : (
               <Input
                 {...common}
                 type={f.kind === "decimal" ? "text" : f.kind}
-                className={f.kind === "date" || f.kind === "time" ? "block min-w-0 appearance-none" : undefined}
+                className={cn("bg-surface", err && "border-destructive focus-visible:ring-destructive")}
                 inputMode={f.kind === "decimal" ? "decimal" : f.kind === "tel" ? "tel" : f.kind === "email" ? "email" : f.kind === "url" ? "url" : undefined}
                 autoComplete={f.autoComplete}
                 autoCapitalize={f.kind === "text" ? undefined : "off"}
