@@ -61,8 +61,8 @@ export function SceneArt({ scene, className }: { scene: StoryScene; className?: 
 
   return (
     <div
-      className={cn("relative isolate aspect-[4/3] w-full overflow-hidden rounded-2xl select-none", className)}
-      style={{ background: scene.setting === "space" ? SKY.night : SKY[scene.time] }}
+      className={cn("relative isolate w-full overflow-hidden rounded-2xl select-none", className)}
+      style={{ aspectRatio: "16 / 11", background: scene.setting === "space" ? SKY.night : SKY[scene.time] }}
       role="img"
       aria-label={`Picture: ${scene.setting}, ${scene.time}`}
     >
