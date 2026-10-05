@@ -50,7 +50,7 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
   const [speedIdx, setSpeedIdx] = useState(1)
   const [autoPlay, setAutoPlay] = useState(false)
   const voice = useReadAloud(lang)
-  const touchX = useRef<number | null>(null)
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const atEnd = index === total
@@ -193,12 +193,19 @@ export function StoryReader({ story, saved, aiEnabled: _aiEnabled, onBack, onSav
       <div
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-3xl"
-        onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
+        onTouchStart={(e) => {
+          touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+        }}
         onTouchEnd={(e) => {
-          if (touchX.current === null) return
-          const dx = e.changedTouches[0].clientX - touchX.current
-          touchX.current = null
-          if (Math.abs(dx) > 50) turn(index + (dx < 0 ? 1 : -1))
+          if (!touchStartRef.current) return
+          const dx = e.changedTouches[0].clientX - touchStartRef.current.x
+          const dy = e.changedTouches[0].clientY - touchStartRef.current.y
+          touchStartRef.current = null
+          
+          // Only turn page if it's a clear horizontal swipe (dx > dy)
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+            turn(index + (dx < 0 ? 1 : -1))
+          }
         }}
       >
         <div
