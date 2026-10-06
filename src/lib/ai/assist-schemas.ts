@@ -248,7 +248,6 @@ export const ASSIST_OUTPUT = {
       .min(1)
       .max(10),
   }),
-  /** Input JSON: { subject, topic, level, style: "examples"|"story"|"exam", language: "en"|"hi" } — a full lesson. */
   "learn-lesson": z.object({
     title: z.string().min(1).max(120),
     intro: z.string().min(1).max(1200),
@@ -264,6 +263,103 @@ export const ASSIST_OUTPUT = {
       .max(3),
     tips: z.array(z.string().max(250)).max(5),
     mistakes: z.array(z.string().max(250)).max(4),
+    studyGuide: z
+      .array(
+        z.object({
+          phase: z.string().min(1).max(200),
+          description: z.string().min(1).max(1500),
+          tasks: z.array(z.string().max(500)).max(15),
+        })
+      )
+      .max(15)
+      .optional(),
+    resources: z
+      .array(
+        z.object({
+          name: z.string().min(1).max(200),
+          type: z.string().max(100),
+          description: z.string().max(600),
+        })
+      )
+      .max(15)
+      .optional(),
+    deepDive: z
+      .object({
+        title: z.string().min(1).max(200),
+        content: z.array(z.string().max(1500)).max(15),
+      })
+      .optional(),
+    syllabus: z
+      .array(
+        z.object({
+          subject: z.string().min(1).max(200),
+          // Objects only: toGeminiSchema keeps just the first branch of a union, so a
+          // `string | object` union would stop Gemini from ever sending sub-topics.
+          topics: z
+            .array(
+              z.object({
+                name: z.string().min(1).max(200),
+                description: z.string().max(400).optional(),
+                subTopics: z.array(z.string().max(200)).max(30).optional(),
+              })
+            )
+            .max(50),
+        })
+      )
+      .max(20)
+      .optional(),
+    examModules: z
+      .array(
+        z.object({
+          title: z.string().min(1).max(200),
+          topics: z
+            .array(
+              z.object({
+                name: z.string().min(1).max(200),
+                explanation: z.string().min(1).max(3000),
+                keyPoints: z.array(z.string().max(300)).max(8).optional(),
+                example: z.string().max(2000),
+              })
+            )
+            .max(20),
+        })
+      )
+      .max(15)
+      .optional(),
+    explorableLists: z
+      .array(
+        z.object({
+          title: z.string().min(1).max(200),
+          description: z.string().max(800).optional(),
+          items: z.array(
+            z.object({
+              name: z.string().min(1).max(200),
+              subtitle: z.string().max(800).optional()
+            })
+          ).max(50)
+        })
+      )
+      .max(15)
+      .optional(),
+    tables: z
+      .array(
+        z.object({
+          title: z.string().min(1).max(200),
+          columns: z.array(z.string()).max(10),
+          rows: z.array(z.array(z.string())).max(50),
+        })
+      )
+      .max(10)
+      .optional(),
+    metadata: z
+      .array(
+        z.object({
+          key: z.string().min(1).max(100),
+          value: z.string().min(1).max(500),
+        })
+      )
+      .max(20)
+      .optional(),
     practice: z
       .array(
         z.object({
@@ -302,10 +398,31 @@ export const ASSIST_OUTPUT = {
       .min(4)
       .max(14),
   }),
-  /** Input JSON: { subject, topic, lessonTitle, keyIdeas: string[], question, language } — a doubt about a lesson. */
+  /** Input JSON: { subject, topic, lessonTitle, keyIdeas, question, history: { q, a }[], language } — a detailed Markdown answer. */
   "learn-ask": z.object({
-    answer: z.string().min(1).max(1500),
-    example: z.string().max(700).optional(),
+    answer: z.string().min(1).max(6000),
+    example: z.string().max(1500).optional(),
+    followUps: z.array(z.string().max(120)).max(3).optional(),
+  }),
+  /** Input JSON: { subject, lessonTitle, section, topic, hint?, level, language } — an in-depth explanation of one syllabus/module topic. */
+  "learn-topic": z.object({
+    overview: z.string().min(1).max(5000),
+    keyPoints: z.array(z.string().max(300)).max(8),
+    subTopics: z
+      .array(z.object({ name: z.string().min(1).max(120), explanation: z.string().min(1).max(1200) }))
+      .max(8),
+    example: z.string().max(2000),
+    tip: z.string().max(400).optional(),
+    quiz: z
+      .array(
+        z.object({
+          question: z.string().min(1).max(400),
+          options: z.array(z.string().min(1).max(200)).length(4),
+          answerIndex: z.number().int().min(0).max(3),
+          explanation: z.string().max(500),
+        })
+      )
+      .max(2),
   }),
   /** Input JSON: { category, difficulty } */
   "logic-puzzle": z.object({

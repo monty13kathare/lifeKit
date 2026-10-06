@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { ArrowRight, BookOpenCheck, ChevronRight, GraduationCap, Languages, Search, Sparkles, Trash2, Trophy } from "lucide-react"
+import { ArrowRight, BookOpenCheck, ChevronRight, GraduationCap, Languages, Search, Sparkles, Trash2, Trophy, Signal, Palette, Check } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 import { Notice } from "@/components/common/notice"
@@ -37,7 +37,8 @@ export function LearningZone({ tabs }: { tabs?: React.ReactNode }) {
   const [style, setStyle] = useState<LessonStyle>("examples")
   const [topic, setTopic] = useState("")
   const [sheetSubject, setSheetSubject] = useState<LessonSubject | null>(null)
-  const [current, setCurrent] = useState<LearnLesson | null>(null)
+  const [history, setHistory] = useState<LearnLesson[]>([])
+  const current = history[history.length - 1] || null
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const ctlRef = useRef<AbortController | null>(null)
@@ -66,7 +67,8 @@ export function LearningZone({ tabs }: { tabs?: React.ReactNode }) {
         JSON.stringify({ subject, topic: parsed.data, level: lessonLevel, style: lessonStyle, language: lessonLang, simpler: opts.simpler || undefined }),
         ctl.signal
       )
-      setCurrent({ id: createId(), subject, topic: parsed.data, level: lessonLevel, style: lessonStyle, language: lessonLang, createdAt: new Date().toISOString(), data })
+      const newLesson: LearnLesson = { id: createId(), subject, topic: parsed.data, level: lessonLevel, style: lessonStyle, language: lessonLang, createdAt: new Date().toISOString(), data }
+      setHistory((h) => [...h, newLesson])
       setTopic("")
       window.scrollTo({ top: 0, behavior: "smooth" })
     } catch (err) {
@@ -92,8 +94,18 @@ export function LearningZone({ tabs }: { tabs?: React.ReactNode }) {
     if (!current) return
     if (!current.completedAt) awardXp(lessonXp(correct))
     const next: LearnLesson = { ...current, completedAt: current.completedAt ?? new Date().toISOString(), score: Math.round((correct / total) * 100) }
-    setCurrent(next)
+    setHistory((h) => {
+      const clone = [...h]
+      clone[clone.length - 1] = next
+      return clone
+    })
     if (saved) upsert(next)
+  }
+
+  /** Replace a lesson in the open history (e.g. with fetched topic details); saved lessons are persisted too. */
+  const updateLesson = (next: LearnLesson) => {
+    setHistory((h) => h.map((l) => (l.id === next.id ? next : l)))
+    if (lessons.some((l) => l.id === next.id)) upsert(next)
   }
 
   const deleteLesson = (lesson: LearnLesson) => {
@@ -115,16 +127,17 @@ export function LearningZone({ tabs }: { tabs?: React.ReactNode }) {
           onBack={() => {
             ctlRef.current?.abort()
             setLoading(false)
-            setCurrent(null)
+            setHistory((h) => h.slice(0, -1))
           }}
           onSave={() => save(current)}
           onDelete={() => {
             deleteLesson(current)
-            setCurrent(null)
+            setHistory((h) => h.slice(0, -1))
           }}
           onSimpler={() => void generate(current.subject, current.topic, { level: "beginner", style: current.style, simpler: true, language: current.language })}
           onLearnTopic={(next) => void generate(current.subject, next, { language: current.language })}
           onQuizDone={quizDone}
+          onUpdate={updateLesson}
         />
       </ToolPage>
     )
@@ -191,22 +204,22 @@ export function LearningZone({ tabs }: { tabs?: React.ReactNode }) {
 
               {/* Options */}
               {aiEnabled && (
-                <div className="grid gap-3 sm:grid-cols-[auto_1fr]">
-                  <OptionRow label={t("Language", "भाषा")} icon={<Languages className="size-3.5" aria-hidden />}>
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                  <OptionRow label={t("Language", "भाषा")} icon={<Languages className="size-4" aria-hidden />}>
                     {LANGUAGES.map((l) => (
                       <Chip key={l.id} active={lang === l.id} onClick={() => setLangChoice(l.id as AiLanguage)} lang={l.lang}>
                         {l.label}
                       </Chip>
                     ))}
                   </OptionRow>
-                  <OptionRow label={t("Level", "स्तर")}>
+                  <OptionRow label={t("Level", "स्तर")} icon={<Signal className="size-4" aria-hidden />}>
                     {LEVELS.map((l) => (
                       <Chip key={l.id} active={level === l.id} onClick={() => setLevel(l.id)}>
                         {tr(lang, l.name)}
                       </Chip>
                     ))}
                   </OptionRow>
-                  <OptionRow label={t("Style", "तरीका")} className="sm:col-span-2">
+                  <OptionRow label={t("Style", "तरीका")} className="sm:col-span-2 md:col-span-1" icon={<Palette className="size-4" aria-hidden />}>
                     {STYLES.map((s) => (
                       <Chip key={s.id} active={style === s.id} onClick={() => setStyle(s.id)}>
                         {tr(lang, s.name)}
@@ -265,7 +278,7 @@ export function LearningZone({ tabs }: { tabs?: React.ReactNode }) {
                       const Icon = subj?.icon ?? Sparkles
                       return (
                         <li key={l.id} className="flex items-center gap-2 rounded-2xl border bg-card p-2 pr-1.5">
-                          <button type="button" onClick={() => setCurrent(l)} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1.5 text-left hover:bg-muted/50">
+                          <button type="button" onClick={() => setHistory([l])} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1.5 text-left hover:bg-muted/50">
                             <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", subj?.accent ?? "bg-primary/10 text-primary")}>
                               <Icon className="size-5" aria-hidden />
                             </span>
@@ -358,11 +371,11 @@ export function LearningZone({ tabs }: { tabs?: React.ReactNode }) {
 
 function OptionRow({ label, icon, className, children }: { label: string; icon?: React.ReactNode; className?: string; children: React.ReactNode }) {
   return (
-    <div className={cn("min-w-0", className)}>
-      <p className="mb-1.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+    <div className={cn("min-w-0 rounded-2xl border border-primary/10 bg-primary/5 p-3.5 sm:p-4 transition-colors hover:border-primary/20", className)}>
+      <p className="mb-3 flex items-center gap-1.5 text-[0.75rem] font-bold uppercase tracking-wider text-primary/70">
         {icon} {label}
       </p>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
+      <div className="flex flex-wrap gap-2">{children}</div>
     </div>
   )
 }
@@ -375,10 +388,13 @@ function Chip({ active, onClick, lang, children }: { active: boolean; onClick: (
       lang={lang}
       onClick={onClick}
       className={cn(
-        "min-h-10 rounded-full border px-3.5 text-sm font-medium transition-colors",
-        active ? "border-primary bg-primary text-primary-foreground" : "bg-background/70 hover:bg-muted"
+        "flex min-h-9 items-center justify-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[0.8rem] font-semibold transition-all duration-300 ease-out",
+        active
+          ? "border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/30 ring-1 ring-primary ring-offset-1 ring-offset-background scale-[1.02]"
+          : "bg-background/50 text-muted-foreground shadow-sm hover:scale-[1.02] hover:border-primary/40 hover:bg-muted hover:text-foreground active:scale-[0.98]"
       )}
     >
+      {active && <Check className="size-3.5" aria-hidden />}
       {children}
     </button>
   )

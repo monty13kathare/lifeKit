@@ -10,7 +10,7 @@ const bodySchema = z.object({
 })
 
 /** Jobs that benefit from more varied, creative output. */
-const CREATIVE = new Set<AssistKind>(["plan-day", "routine", "write", "goal-plan", "prompt-run", "english-quiz", "fun-quiz", "logic-puzzle", "decision-advice", "health-insights", "health-plan", "learn-lesson", "story-book"])
+const CREATIVE = new Set<AssistKind>(["plan-day", "routine", "write", "goal-plan", "prompt-run", "english-quiz", "fun-quiz", "logic-puzzle", "decision-advice", "health-insights", "health-plan", "learn-lesson", "learn-topic", "story-book"])
 
 const DATE_RULES =
   "Resolve relative dates and times (today, tomorrow, next Friday, tonight, in 2 hours) against the user's current local date-time given below. " +
@@ -107,16 +107,30 @@ const INSTRUCTIONS: Record<AssistKind, string> = {
     "Create multiple-choice English questions on the given topic and level (count from input, max 10). Each has exactly 4 options, one correct answerIndex (0–3), " +
     "and a short explanation of why. Vary the correct position. Questions must be unambiguous with exactly one correct answer.",
   "learn-lesson":
-    "You are a warm, patient teacher who makes any topic easy. Input JSON: subject, topic (may be anything the learner typed), optional simpler flag, level (beginner | intermediate | advanced) and style " +
+    "You are a warm, patient, and highly intelligent teacher who makes any topic easy and incredibly detailed. Your explanations must be of the highest quality—comparable to the very best responses from Claude 3.5 or GPT-4o. " +
+    "Input JSON: subject, topic (may be anything the learner typed), optional simpler flag, level (beginner | intermediate | advanced) and style " +
     "(examples = everyday relatable examples, ideally Indian daily life; story = teach through one memorable story whose characters reappear in the examples; exam = competitive-exam focus " +
-    "(school, SSC, bank, railway) with question patterns, shortcuts and time-saving tricks). Write ONE complete lesson: a short catchy title; a simple intro (what it is and why it matters, 2–4 sentences); " +
-    "2–6 key ideas, each with a plain explanation and a concrete easy example (for reasoning, show the working, e.g. family trees as 'A → father of → B', directions as step lists, series with the rule spelled out); " +
+    "(school, SSC, bank, railway) with question patterns, shortcuts, study guides, and time-saving tricks; deep-dive = extremely detailed theoretical breakdown, history, and advanced mechanics; " +
+    "interview = prepare the user for job interviews with common questions, ideal answers, edge cases, and real-world scenarios). Write ONE complete, in-depth lesson: a short catchy title; a simple intro (what it is and why it matters, 2–4 sentences); " +
+    "2–6 key ideas, each with a highly detailed explanation that breaks down the concept step-by-step, followed by a concrete easy example; " +
     "a short story (title + 4–10 sentences) that explains the concept through characters and a situation; a step-by-step method for solving or using it (empty if not applicable); " +
-    "1–3 worked examples with a question, clear solution steps and the final answer; up to 5 tips or shortcuts; up to 4 common mistakes; 2–4 practice multiple-choice questions answerable from the lesson " +
+    "1–3 worked examples with a question, clear solution steps and the final answer; up to 5 tips or shortcuts; up to 4 common mistakes; " +
+    "CRITICAL INSTRUCTION: You MUST be extremely exhaustive and generate LONG, highly detailed, beautifully structured answers. DO NOT summarize. Use a professional yet conversational tone, explaining the 'Why' behind every concept. " +
+    "You MUST aggressively populate these optional structured fields to create a rich UI: " +
+    "1. 'metadata': ALWAYS use for quick key facts (Total Marks, Dates, Time). " +
+    "2. 'tables': ALWAYS use for structured data (Exam Pattern, Comparisons). " +
+    "3. 'syllabus': ALWAYS use if the topic has a curriculum/exam. Break down EVERY SINGLE subject into 4–10 topic objects; give each topic a one-sentence 'description' and 3–8 real 'subTopics' (e.g. ['Nouns', 'Verbs']). DO NOT put translations or dummy text in subTopics. DO NOT SKIP ANY. " +
+    "4. 'studyGuide': ALWAYS use for preparation strategies, timelines, or step-by-step roadmaps. Write long descriptions for each phase. " +
+    "5. 'deepDive': ALWAYS use to provide massive, paragraph-based detailed background info, theories, or core concepts. " +
+    "6. 'examModules': ALWAYS use for exams/complex topics. Create 3–6 modules with 3–6 topics each; every topic needs an 'explanation' of 120–250 words (Markdown allowed), 3–5 'keyPoints' and a concrete 'example'. " +
+    "7. 'explorableLists': Use for large categorizations (e.g., Types of X). " +
+    "Your output must be huge and comprehensive. Fill all these arrays with maximum detail and items. " +
+    "Inside key idea explanations, deepDive paragraphs and examModules explanations/examples you may use light Markdown: **bold** key terms, '- ' bullets and '1. ' steps on their own lines. " +
+    "Include 'resources' suggesting books, websites, or materials to refer to; " +
+    "2–4 practice multiple-choice questions answerable from the lesson " +
     "(exactly 4 options, one correct answerIndex 0–3, vary its position, short explanation); 2–6 key takeaways for the summary; and up to 4 related topics to learn next. " +
-    "Match depth to the level: beginner = very simple words and small numbers; advanced = deeper rules and harder examples. Be accurate — for facts, grammar and maths double-check every example and answer. " +
-    "If simpler is true, the learner found the last explanation hard: use even simpler words, shorter sentences, smaller numbers and more everyday comparisons. " +
-    "If the topic is unsafe or unsuitable for a learning app, teach a closely related safe topic instead.",
+    "Match depth to the level: beginner = very simple words; advanced = deeper rules and harder examples. Be accurate. " +
+    "If simpler is true, use even simpler words and more everyday comparisons. If the topic is unsafe, teach a closely related safe topic instead.",
   "story-book":
     "You are a gifted children's author writing an illustrated picture-book story. Input JSON: theme (e.g. Panchatantra, Akbar–Birbal, adventure, mystery, space, friendship, funny, custom), " +
     "optional idea from the reader, age group and the number of pages. Write an ORIGINAL, engaging story with a clear beginning, a problem, a turning point and a satisfying ending, " +
@@ -126,8 +140,20 @@ const INSTRUCTIONS: Record<AssistKind, string> = {
     "and imagePrompt: an English one-to-two sentence description of the picture for an illustrator (characters' look, action, place), consistent across pages. " +
     "End with a one-line moral. Keep it wholesome, kind and suitable for all ages; if the idea is unsuitable, write a gentle story on the theme instead.",
   "learn-ask":
-    "You are a patient teacher answering a learner's doubt about the lesson described in the input JSON. Give a clear, simple answer (≤ 150 words) that builds on the lesson's ideas, " +
-    "and one short easy example that makes it click. If the question is off-topic, answer briefly if it's a reasonable learning question, otherwise say you can help with this lesson's topic.",
+    "You are an expert, patient teacher answering a learner's doubt about the lesson described in the input JSON (history holds the earlier questions and answers in this chat — use it for follow-ups). " +
+    "Give a complete, well-structured answer like a top AI assistant: start with a one-sentence direct answer, then explain the why step by step. " +
+    "Format `answer` in Markdown: '## ' short section headings when the answer has several parts, '- ' bullets, '1. ' numbered steps, **bold** for key terms, and a small pipe table when comparing things. " +
+    "Usually 150–450 words — shorter for simple questions, never padded. For reasoning or maths, show every step of the working. " +
+    "Put one concrete worked example in `example` (Markdown allowed) and 2–3 short follow-up questions the learner might ask next in `followUps`. " +
+    "Be accurate. If the question is off-topic, answer briefly if it's a reasonable learning question, otherwise say you can help with this lesson's topic.",
+  "learn-topic":
+    "You are an expert teacher writing the in-depth study notes for ONE topic of a larger lesson. Input JSON: subject, lessonTitle, section (the module or syllabus group it belongs to), " +
+    "topic, optional hint (a short existing note), level and language. Cover the topic completely, like a top AI assistant's best answer: " +
+    "`overview` in Markdown — what it is, why it matters, how it works step by step, with '## ' headings for its parts, '- ' bullets, '1. ' steps, **bold** key terms and a pipe table when comparing (300–600 words); " +
+    "4–8 `keyPoints` to remember (one sentence each); 3–8 `subTopics`, each with a clear 2–5 sentence explanation; one concrete worked `example` in Markdown " +
+    "(for code topics a short code block, for reasoning/maths every step shown); an optional exam or practical `tip`; and 2 multiple-choice `quiz` questions " +
+    "(exactly 4 options, one correct answerIndex 0–3, vary its position, short explanation). Match depth to the level. Be accurate — double-check facts, code and answers. " +
+    "If the topic is unsafe, explain a closely related safe topic instead.",
   "logic-puzzle":
     "Create one original logic puzzle for the given category and difficulty (easy | medium | hard). Categories: sequence (number/letter patterns), deduction (who-owns-what grids, " +
     "liars and truth-tellers), lateral (riddles), math (word problems). It must have a single, verifiable answer. Give a short title, the puzzle text, " +
@@ -150,7 +176,7 @@ const INSTRUCTIONS: Record<AssistKind, string> = {
 }
 
 /** Jobs whose JSON is long (several questions, possibly bilingual). */
-const MAX_OUTPUT_TOKENS: Partial<Record<AssistKind, number>> = { "fun-quiz": 8192, "health-plan": 8192, "learn-lesson": 8192, "story-book": 8192 }
+const MAX_OUTPUT_TOKENS: Partial<Record<AssistKind, number>> = { "fun-quiz": 8192, "health-plan": 8192, "learn-lesson": 16384, "learn-ask": 6144, "learn-topic": 8192, "story-book": 8192 }
 
 /** Structured AI help for the My Life tools (parse, capture, subtasks, routine, extract, plan). */
 export async function POST(request: Request) {
@@ -269,6 +295,7 @@ function languageRule(kind: AssistKind, lang: "en" | "hi", input: string): strin
       return funQuizLanguageRule(input)
     case "learn-lesson":
     case "learn-ask":
+    case "learn-topic":
     case "story-book":
       return lessonLanguageRule(input)
     case "logic-puzzle":

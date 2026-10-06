@@ -140,6 +140,8 @@ export const LEVELS: { id: LessonLevel; name: Bilingual }[] = [
 export const STYLES: { id: LessonStyle; name: Bilingual; blurb: Bilingual }[] = [
   { id: "examples", name: { en: "Easy examples", hi: "आसान उदाहरण" }, blurb: { en: "Everyday examples", hi: "रोज़मर्रा के उदाहरण" } },
   { id: "story", name: { en: "Through a story", hi: "कहानी से" }, blurb: { en: "Learn it as a story", hi: "कहानी के ज़रिए सीखें" } },
+  { id: "deep-dive", name: { en: "Deep Dive", hi: "गहराई से समझें" }, blurb: { en: "Detailed breakdown", hi: "विस्तृत जानकारी" } },
+  { id: "interview", name: { en: "Interview Prep", hi: "इंटरव्यू की तैयारी" }, blurb: { en: "Q&A and scenarios", hi: "सवाल-जवाब और परिदृश्य" } },
   { id: "exam", name: { en: "Exam focus", hi: "परीक्षा फ़ोकस" }, blurb: { en: "Patterns and shortcuts", hi: "पैटर्न और शॉर्टकट" } },
 ]
 

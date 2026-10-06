@@ -380,7 +380,7 @@ export interface FunStats {
 /* ---------------------------------------------------------- Learning Zone */
 
 export type LessonLevel = "beginner" | "intermediate" | "advanced"
-export type LessonStyle = "examples" | "story" | "exam"
+export type LessonStyle = "examples" | "story" | "exam" | "deep-dive" | "interview"
 
 /** Output of the `learn-lesson` AI job. */
 export interface LessonContent {
@@ -392,6 +392,15 @@ export interface LessonContent {
   examples: { question: string; steps: string[]; answer: string }[]
   tips: string[]
   mistakes: string[]
+  metadata?: { key: string; value: string }[]
+  tables?: { title: string; columns: string[]; rows: string[][] }[]
+  /** Older lessons may hold plain-string topics. */
+  syllabus?: { subject: string; topics: ({ name: string; description?: string; subTopics?: string[] } | string)[] }[]
+  examModules?: { title: string; topics: { name: string; explanation: string; keyPoints?: string[]; example: string }[] }[]
+  explorableLists?: { title: string; description?: string; items: { name: string; subtitle?: string }[] }[]
+  studyGuide?: { phase: string; description: string; tasks: string[] }[]
+  resources?: { name: string; type: string; description: string }[]
+  deepDive?: { title: string; content: string[] }
   practice: { question: string; options: string[]; answerIndex: number; explanation: string }[]
   summary: string[]
   nextTopics: string[]
@@ -411,6 +420,18 @@ export interface LearnLesson {
   /** Quick-check score in percent. */
   score?: number
   data: LessonContent
+  /** In-depth explanations fetched on demand, keyed by `topicKey(section, topic)`. */
+  topicDetails?: Record<string, TopicDetail>
+}
+
+/** Output of the `learn-topic` AI job. */
+export interface TopicDetail {
+  overview: string
+  keyPoints: string[]
+  subTopics: { name: string; explanation: string }[]
+  example: string
+  tip?: string
+  quiz: { question: string; options: string[]; answerIndex: number; explanation: string }[]
 }
 
 /* ------------------------------------------------------------ Story Mode */

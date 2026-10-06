@@ -1,4 +1,4 @@
-import { BookA, BookOpen, Brain, Calculator, Globe2, Lightbulb, MessageCircleQuestion, Quote, type LucideIcon } from "lucide-react"
+import { BookA, BookOpen, Brain, Calculator, Globe2, Lightbulb, MessageCircleQuestion, Quote, Monitor, type LucideIcon } from "lucide-react"
 import type { FunMode } from "@/types"
 
 /** A label in both quiz languages. */
@@ -88,17 +88,17 @@ export const FUN_CATEGORIES: FunCategory[] = [
     ],
   },
   {
-    id: "story",
-    name: { en: "Story Quest", hi: "कहानी क्वेस्ट" },
-    blurb: { en: "Read a short story, then answer", hi: "छोटी कहानी पढ़ें, फिर जवाब दें" },
-    icon: BookOpen,
+    id: "cs",
+    name: { en: "Computer Science", hi: "कंप्यूटर विज्ञान" },
+    blurb: { en: "Coding, hardware and internet", hi: "कोडिंग, हार्डवेयर और इंटरनेट" },
+    icon: Monitor,
     accent: "bg-indigo-500/10 text-indigo-600 dark:bg-indigo-400/15 dark:text-indigo-300",
     topics: [
-      { en: "Moral stories", hi: "नैतिक कहानियाँ" },
-      { en: "Panchatantra", hi: "पंचतंत्र" },
-      { en: "Akbar & Birbal", hi: "अकबर-बीरबल" },
-      { en: "Mystery & detective", hi: "रहस्य और जासूसी" },
-      { en: "What happens next?", hi: "आगे क्या होगा?" },
+      { en: "Programming basics", hi: "प्रोग्रामिंग बेसिक्स" },
+      { en: "Internet & web", hi: "इंटरनेट और वेब" },
+      { en: "Hardware", hi: "हार्डवेयर" },
+      { en: "Software", hi: "सॉफ़्टवेयर" },
+      { en: "History of computing", hi: "कंप्यूटिंग का इतिहास" },
     ],
   },
   {
