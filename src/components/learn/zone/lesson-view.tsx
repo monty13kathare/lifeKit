@@ -434,8 +434,8 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
         </Section>
       )}
 
-      {/* Quick check */}
-      {d.practice.length > 0 && <QuickCheck key={lesson.id} lesson={lesson} onDone={onQuizDone} />}
+      {/* Quick check. Keys must differ from AskDoubt's: siblings sharing a key made React duplicate the quiz when it finished. */}
+      {d.practice.length > 0 && <QuickCheck key={`quiz-${lesson.id}`} lesson={lesson} onDone={onQuizDone} />}
 
       {/* Summary */}
       {d.summary.length > 0 && (
@@ -473,7 +473,7 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
         </section>
       )}
 
-      {aiEnabled && <AskDoubt key={lesson.id} lesson={lesson} />}
+      {aiEnabled && <AskDoubt key={`ask-${lesson.id}`} lesson={lesson} />}
     </article>
   )
 }
@@ -886,7 +886,9 @@ function QuickCheck({ lesson, onDone }: { lesson: LearnLesson; onDone: (correct:
   const qs = lesson.data.practice
   const [picked, setPicked] = useState<(number | null)[]>(() => qs.map(() => null))
   // Was the quick check already finished before this attempt? (XP is only awarded once.)
-  const [retake] = useState(() => !!lesson.completedAt)
+  const [finishedBefore] = useState(() => !!lesson.completedAt)
+  const [attempts, setAttempts] = useState(0)
+  const retake = finishedBefore || attempts > 0
   const answered = picked.filter((p) => p !== null).length
   const correct = picked.filter((p, i) => p === qs[i].answerIndex).length
   const done = answered === qs.length
@@ -929,12 +931,33 @@ function QuickCheck({ lesson, onDone }: { lesson: LearnLesson; onDone: (correct:
                       show && !right && !isPicked && "opacity-60"
                     )}
                   >
-                    <span className="font-semibold text-muted-foreground">{String.fromCharCode(65 + oi)}.</span> {o}
+                    <span className={cn("font-semibold", show && right ? "text-success" : show && isPicked ? "text-destructive" : "text-muted-foreground")}>
+                      {show && right ? <CheckCircle2 className="size-4" aria-label="Correct answer" /> : show && isPicked ? <X className="size-4" aria-label="Your answer" /> : `${String.fromCharCode(65 + oi)}.`}
+                    </span>
+                    <span className="min-w-0">{o}</span>
                   </button>
                 )
               })}
             </div>
-            {picked[qi] !== null && <p className="mt-2 animate-in rounded-lg bg-muted/60 px-3 py-2 text-xs leading-relaxed fade-in">{q.explanation}</p>}
+            {picked[qi] !== null && (
+              <div
+                role="status"
+                className={cn(
+                  "mt-2 animate-in rounded-lg px-3 py-2 text-xs leading-relaxed fade-in",
+                  picked[qi] === q.answerIndex ? "bg-success/10" : "bg-destructive/8"
+                )}
+              >
+                <p className={cn("mb-0.5 font-semibold", picked[qi] === q.answerIndex ? "text-success" : "text-destructive")}>
+                  {picked[qi] === q.answerIndex
+                    ? tr(lang, { en: "Correct!", hi: "सही जवाब!" })
+                    : tr(lang, {
+                        en: `Not quite — the answer is ${String.fromCharCode(65 + q.answerIndex)}.`,
+                        hi: `सही जवाब ${String.fromCharCode(65 + q.answerIndex)} है।`,
+                      })}
+                </p>
+                <p className="text-muted-foreground">{q.explanation}</p>
+              </div>
+            )}
           </li>
         ))}
       </ol>
@@ -947,6 +970,12 @@ function QuickCheck({ lesson, onDone }: { lesson: LearnLesson; onDone: (correct:
               : tr(lang, { en: `${correct} of ${qs.length} correct · +${lessonXp(correct)} XP`, hi: `${qs.length} में से ${correct} सही · +${lessonXp(correct)} XP` })}
             {retake && <span className="block text-xs font-normal text-muted-foreground">{tr(lang, { en: "XP is awarded the first time only.", hi: "XP केवल पहली बार मिलता है।" })}</span>}
           </p>
+          <Button variant="outline" size="sm" className="ml-auto h-10" onClick={() => {
+              setPicked(qs.map(() => null))
+              setAttempts((a) => a + 1)
+            }}>
+            <RefreshCw aria-hidden /> {tr(lang, { en: "Try again", hi: "फिर से करें" })}
+          </Button>
         </div>
       )}
     </Section>
