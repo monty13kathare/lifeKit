@@ -154,6 +154,48 @@ export function PdfEditorWorkspace({ session, onClose }: { session: EditorSessio
     : 1
   const scale = zoom === "fit" ? Math.max(0.1, fitScale) : (zoom / 100) * PX_PER_POINT
   const percent = Math.round((scale / PX_PER_POINT) * 100)
+  // Pinch with two fingers to zoom (phones/tablets), keeping the point between the fingers in place.
+  const scaleRef = useRef(scale)
+  useEffect(() => {
+    scaleRef.current = scale
+  })
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const minScale = (ZOOM_LEVELS[0] / 100) * PX_PER_POINT
+    const maxScale = (ZOOM_LEVELS[ZOOM_LEVELS.length - 1] / 100) * PX_PER_POINT
+    let pinch: { dist: number; scale: number; cx: number; contentX: number } | null = null
+    const spread = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2 - el.getBoundingClientRect().left
+      pinch = { dist: spread(e.touches) || 1, scale: scaleRef.current, cx, contentX: (el.scrollLeft + cx) / scaleRef.current }
+    }
+    const onMove = (e: TouchEvent) => {
+      if (!pinch || e.touches.length !== 2) return
+      e.preventDefault() // we handle this gesture, not the browser
+      const next = Math.min(maxScale, Math.max(minScale, (pinch.scale * spread(e.touches)) / pinch.dist))
+      setZoom(Math.round((next / PX_PER_POINT) * 100))
+      const p = pinch
+      requestAnimationFrame(() => {
+        el.scrollLeft = p.contentX * next - p.cx
+      })
+    }
+    const onEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) pinch = null
+    }
+    el.addEventListener("touchstart", onStart, { passive: true })
+    el.addEventListener("touchmove", onMove, { passive: false })
+    el.addEventListener("touchend", onEnd)
+    el.addEventListener("touchcancel", onEnd)
+    return () => {
+      el.removeEventListener("touchstart", onStart)
+      el.removeEventListener("touchmove", onMove)
+      el.removeEventListener("touchend", onEnd)
+      el.removeEventListener("touchcancel", onEnd)
+    }
+  }, [])
+
   const zoomIn = useCallback(() => setZoom(ZOOM_LEVELS.find((z) => z > percent) ?? ZOOM_LEVELS[ZOOM_LEVELS.length - 1]), [percent])
   const zoomOut = useCallback(() => setZoom([...ZOOM_LEVELS].reverse().find((z) => z < percent) ?? ZOOM_LEVELS[0]), [percent])
 
@@ -579,13 +621,17 @@ export function PdfEditorWorkspace({ session, onClose }: { session: EditorSessio
         </aside>
 
         {/* Canvas */}
-        <section className="flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-surface-muted lg:min-h-0" aria-label="Page editor">
-          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b bg-card px-1.5 py-1">
+        {/* overflow-clip (not hidden) keeps the rounded corners without breaking the sticky toolbar */}
+        <section className="flex min-w-0 flex-col overflow-clip rounded-2xl border bg-surface-muted lg:min-h-0" aria-label="Page editor">
+          {/* On phones the page/zoom bar sticks under the app header while you scroll the PDF */}
+          <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-20 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b bg-card/95 px-1.5 py-1 backdrop-blur lg:static lg:bg-card">
             {pageNav}
             <div className="order-last w-full sm:order-none sm:w-auto">{pageActions}</div>
             {zoomControls}
           </div>
-          <div ref={scrollRef} className="relative overflow-auto overscroll-contain lg:min-h-0 lg:flex-1">
+          {/* Mobile: no overscroll-contain — it stopped vertical swipes on the PDF from scrolling the page.
+              Sideways panning (when zoomed in) still scrolls this box. */}
+          <div ref={scrollRef} className="relative overflow-auto lg:min-h-0 lg:flex-1 lg:overscroll-contain">
             <div className="flex w-max min-w-full justify-center p-2 lg:min-h-full lg:items-center lg:p-6">
               <PageCanvas
                 pdf={session.pdf}
