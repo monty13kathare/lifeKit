@@ -198,7 +198,8 @@ export function ToolOptions({
             <ol className="list-decimal space-y-1 pl-4">
               <li>Click any heading, line or paragraph on the page.</li>
               <li>Type your changes right there — the original font, size and colour are kept.</li>
-              <li>Click outside or press Done to save. Esc cancels.</li>
+              <li>Click anywhere outside the text to save (or Ctrl+Enter). Esc cancels.</li>
+              <li>To change colour or size, switch to Select and click the edited text.</li>
             </ol>
             <p>Only the lines you change are replaced; everything else stays exactly as it was.</p>
           </div>

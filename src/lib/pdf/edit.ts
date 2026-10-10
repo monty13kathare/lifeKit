@@ -114,6 +114,10 @@ export interface TextReplaceAnnotation {
   matrix?: [number, number, number, number]
   /** Distance between baselines for multi-line text, in points. */
   lineGap?: number
+  /** Horizontal shift (pt) of the redrawn text, when an edit earlier on the line changed its width. */
+  shiftX?: number
+  /** Width (pt) a justified line's text should fill (spaces widen/narrow); used on export. */
+  targetWidth?: number
   /** Extra word spacing (pt) of a justified original line, for the on-screen preview. */
   wordSpacing?: number
   /** Font ascent/descent in em, used to place the on-screen baseline. */
@@ -560,24 +564,26 @@ export async function exportEditedPdf({
       return toPdf(nx, ny)
     }
 
+    // Covers for text we couldn't remove from the content, all drawn before any
+    // redrawn text so a cover never hides text that was moved next to it.
+    for (const a of pageAnnotations) {
+      if (a.type !== "text-replace" || cleanReplace.has(a.id)) continue
+      const bleedX = 1
+      const bleedY = 1.2
+      page.drawRectangle({
+        x: crop.x + a.x * W - bleedX,
+        y: crop.y + H - (a.y + a.h) * H - bleedY,
+        width: a.w * W + bleedX * 2,
+        height: a.h * H + bleedY * 2,
+        color: color(a.bgColor || "#ffffff"),
+        opacity: 1,
+      })
+    }
+
     for (const a of pageAnnotations) {
       switch (a.type) {
         case "text-replace": {
-          // 1. Hide the original text. Usually it was removed from the content
-          //    above; otherwise paint a cover box (with a tiny bleed for anti-aliasing).
-          if (!cleanReplace.has(a.id)) {
-            const bleedX = 1
-            const bleedY = 1.2
-            page.drawRectangle({
-              x: crop.x + a.x * W - bleedX,
-              y: crop.y + H - (a.y + a.h) * H - bleedY,
-              width: a.w * W + bleedX * 2,
-              height: a.h * H + bleedY * 2,
-              color: color(a.bgColor || "#ffffff"),
-              opacity: 1,
-            })
-          }
-
+          // 1. The original text was removed above, or covered in the pass before this loop.
           if (!a.text || !a.text.trim()) break
 
           // 2. Redraw the text at the original text matrix. Characters the
@@ -586,7 +592,8 @@ export async function exportEditedPdf({
           const [ma, mb, mc, md] = a.matrix ?? [1, 0, 0, 1]
           const upLen = Math.hypot(mc, md) || 1
           const up = { x: mc / upLen, y: md / upLen }
-          const x0 = crop.x + a.x * W
+          // shiftX: moved along the line because an earlier edit on it changed width.
+          const x0 = crop.x + a.x * W + (a.shiftX ?? 0)
           const y0 =
             a.baselineY !== undefined ? crop.y + H - a.baselineY * H : crop.y + H - a.y * H - a.fontSize * TEXT_BASELINE
           const reuse = a.pdfFontName && a.useOriginalFont !== false ? originalFont(a.pdfFontName) : null
@@ -631,10 +638,13 @@ export async function exportEditedPdf({
               const sx = Math.hypot(ma, mb) || 1
               const actual = (strip.w * W) / sx
               const perSpace = (actual - (reuse.measure(orig) * a.fontSize) / 1000 - tracking(orig)) / spaces(orig)
+              // Reflowed lines say how wide this piece should now be; otherwise keep the original width.
+              const target = lines.length === 1 && a.targetWidth !== undefined ? a.targetWidth / sx : actual
               if (Number.isFinite(perSpace) && perSpace > a.fontSize * 0.03) {
                 let natural = (reuse.measure(line) * a.fontSize) / 1000 + tracking(line)
                 for (const fb of fallbacks.values()) natural += fb.f.widthOfTextAtSize(fb.text, a.fontSize)
-                const extra = Math.min(perSpace * 3 + a.fontSize * 0.25, Math.max(0, (actual - natural) / spaces(line)))
+                // Same rule as the on-screen reflow: fill the target width (capped so a nearly empty line stays readable).
+                const extra = Math.min(a.fontSize * 2, Math.max(0, (target - natural) / spaces(line)))
                 spaceExtra = (extra * 1000) / a.fontSize
               }
             }
