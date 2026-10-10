@@ -25,6 +25,7 @@ import {
   Trash2,
   Type,
   Undo2,
+  X,
   ZoomIn,
   ZoomOut,
 } from "lucide-react"
@@ -76,6 +77,9 @@ export interface EditorSession {
   encrypted: boolean
 }
 
+/** How long the "edited PDF is ready" message stays up. */
+const RESULT_NOTICE_MS = 10_000
+
 const TOOLS: { id: Tool; label: string; icon: typeof Type; shortcut: string }[] = [
   { id: "select", label: "Select", icon: MousePointer2, shortcut: "V" },
   { id: "edit-text", label: "Edit text", icon: FilePenLine, shortcut: "E" },
@@ -110,6 +114,12 @@ export function PdfEditorWorkspace({ session, onClose }: { session: EditorSessio
   const [confirmClose, setConfirmClose] = useState(false)
   const [saving, setSaving] = useState<{ progress: number; label: string } | null>(null)
   const [result, setResult] = useState<{ name: string; size: number } | null>(null)
+  // The "PDF is ready" message hides itself after a few seconds.
+  useEffect(() => {
+    if (!result) return
+    const id = window.setTimeout(() => setResult(null), RESULT_NOTICE_MS)
+    return () => window.clearTimeout(id)
+  }, [result])
   const [saveError, setSaveError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -535,9 +545,14 @@ export function PdfEditorWorkspace({ session, onClose }: { session: EditorSessio
           tone="success"
           title="Your edited PDF is ready"
           action={
-            <Button variant="outline" onClick={save}>
-              <Download aria-hidden /> Download again
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={save}>
+                <Download aria-hidden /> Download again
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setResult(null)} aria-label="Dismiss">
+                <X aria-hidden />
+              </Button>
+            </div>
           }
         >
           {result.name} · {formatBytes(result.size)}. Check your downloads folder.
