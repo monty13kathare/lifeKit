@@ -192,6 +192,11 @@ function parseBlocks(text: string): ReactNode {
   })
 }
 
+/** One line of light Markdown (`code`, **bold**, *italic*) inside running text — no block elements. */
+export function InlineText({ text }: { text: string }) {
+  return <>{inline(text)}</>
+}
+
 /** `code`, **bold**, *italic* (underscores are left alone so snake_case survives). */
 function inline(text: string): ReactNode {
   const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g)

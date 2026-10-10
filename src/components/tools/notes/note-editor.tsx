@@ -2,10 +2,24 @@
 
 import { useEffect, useRef, useState } from "react"
 import { format, parseISO } from "date-fns"
-import { ChevronLeft, Copy, Download, FileText, ListChecks, MoreVertical, Palette, Pin, PinOff, Trash2 } from "lucide-react"
+import {
+  Check,
+  ChevronLeft,
+  Copy,
+  Download,
+  FileText,
+  ListChecks,
+  LoaderCircle,
+  MoreVertical,
+  Palette,
+  Pin,
+  PinOff,
+  Plus,
+  Trash2,
+} from "lucide-react"
 import { toast } from "sonner"
 import { AiTextActions } from "@/components/common/ai-text-actions"
-import { CopyButton } from "@/components/common/copy-button"
+import { CopyButton, copyText } from "@/components/common/copy-button"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -54,10 +68,27 @@ interface NoteEditorProps {
   allTags: string[]
   /** Mobile back button. */
   onBack?: () => void
+  /** Mobile "Done": save and return to the list. */
+  onDone?: () => void
+  /** Start a new note (in the editor header on phones, where the page has no button for it). */
+  onNew?: () => void
+  /** Receives a function that saves pending edits right away (used before creating a note). */
+  flushRef?: React.RefObject<(() => void) | null>
 }
 
 /** Title + content editor that autosaves (debounced) and flushes on unmount. Key it by note id. */
-export function NoteEditor({ note, onSave, onUpdateMeta, onDelete, onDuplicate, allTags, onBack }: NoteEditorProps) {
+export function NoteEditor({
+  note,
+  onSave,
+  onUpdateMeta,
+  onDelete,
+  onDuplicate,
+  allTags,
+  onBack,
+  onDone,
+  onNew,
+  flushRef,
+}: NoteEditorProps) {
   const [title, setTitle] = useState(note.title)
   const [content, setContent] = useState(note.content)
   const [status, setStatus] = useState<"saved" | "saving">("saved")
@@ -87,6 +118,20 @@ export function NoteEditor({ note, onSave, onUpdateMeta, onDelete, onDuplicate, 
       setStatus("saved")
     }, SAVE_DELAY)
   }
+
+  const saveNow = () => {
+    flush()
+    setStatus("saved")
+  }
+
+  // Let the page save pending edits on demand (e.g. right before "New note").
+  useEffect(() => {
+    if (!flushRef) return
+    flushRef.current = saveNow
+    return () => {
+      flushRef.current = null
+    }
+  })
 
   const changeContent = (next: string) => {
     setContent(next)
@@ -140,8 +185,18 @@ export function NoteEditor({ note, onSave, onUpdateMeta, onDelete, onDuplicate, 
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-2 border-b px-3 py-2 sm:px-4">
+    <div
+      className="flex h-full min-h-0 flex-col"
+      onKeyDown={(e) => {
+        // Ctrl/Cmd+S saves right away (notes also save automatically as you type).
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+          e.preventDefault()
+          saveNow()
+          toast.success("Note saved")
+        }
+      }}
+    >
+      <div className="flex items-center gap-1 border-b px-2 py-2 sm:gap-2 sm:px-4">
         {onBack ? (
           <Button
             variant="ghost"
@@ -151,38 +206,70 @@ export function NoteEditor({ note, onSave, onUpdateMeta, onDelete, onDuplicate, 
               flush()
               onBack()
             }}
-            className="-ml-1"
           >
             <ChevronLeft aria-hidden />
           </Button>
         ) : null}
-        <SourceBadge source={note.source} />
-        <span className="min-w-0 truncate text-xs text-muted-foreground" aria-live="polite">
+        <span className="hidden sm:inline-flex">
+          <SourceBadge source={note.source} />
+        </span>
+        <span
+          className={cn(
+            "inline-flex min-w-0 items-center gap-1 truncate text-xs",
+            status === "saving" ? "text-muted-foreground" : "text-success"
+          )}
+          aria-live="polite"
+        >
           {status === "saving" ? (
-            "Saving…"
+            <>
+              <LoaderCircle className="size-3.5 shrink-0 animate-spin" aria-hidden /> Saving…
+            </>
           ) : (
             <>
-              Saved<span className="hidden sm:inline"> · {format(parseISO(note.updatedAt), "MMM d, h:mm a")}</span>
+              <Check className="size-3.5 shrink-0" aria-hidden /> Saved
+              <span className="hidden text-muted-foreground sm:inline"> · {format(parseISO(note.updatedAt), "MMM d, h:mm a")}</span>
             </>
           )}
         </span>
         <div className="ml-auto flex shrink-0 items-center gap-1">
+          {onNew ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="New note"
+              onClick={() => {
+                flush()
+                onNew()
+              }}
+            >
+              <Plus aria-hidden />
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="icon"
             aria-label={note.pinned ? "Unpin note" : "Pin note"}
             aria-pressed={!!note.pinned}
             onClick={togglePin}
-            className={cn(note.pinned && "text-primary")}
+            className={cn("hidden sm:inline-flex", note.pinned && "text-primary")}
           >
             {note.pinned ? <PinOff aria-hidden /> : <Pin aria-hidden />}
           </Button>
-          <CopyButton value={text} label="Copy note" iconOnly variant="ghost" />
+          <span className="hidden sm:inline-flex">
+            <CopyButton value={text} label="Copy note" iconOnly variant="ghost" />
+          </span>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="More note actions" />}>
               <MoreVertical aria-hidden />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
+              {/* On phones pin and copy live here to keep the header roomy. */}
+              <DropdownMenuItem className="sm:hidden" onClick={togglePin}>
+                {note.pinned ? <PinOff aria-hidden /> : <Pin aria-hidden />} {note.pinned ? "Unpin" : "Pin to top"}
+              </DropdownMenuItem>
+              <DropdownMenuItem className="sm:hidden" disabled={!text.trim()} onClick={() => void copyText(text)}>
+                <Copy aria-hidden /> Copy text
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
                   flush()
@@ -220,10 +307,27 @@ export function NoteEditor({ note, onSave, onUpdateMeta, onDelete, onDuplicate, 
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {onDone ? (
+            <Button
+              size="sm"
+              className="ml-1 h-10 px-3"
+              onClick={() => {
+                flush()
+                onDone()
+              }}
+            >
+              <Check aria-hidden /> Done
+            </Button>
+          ) : null}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 sm:px-4" role="toolbar" aria-label="Note tools">
+      {/* One scrollable row on phones instead of wrapping onto two lines */}
+      <div
+        className="flex items-center gap-2 overflow-x-auto border-b px-3 py-2 [scrollbar-width:none] sm:flex-wrap sm:px-4 *:shrink-0"
+        role="toolbar"
+        aria-label="Note tools"
+      >
         <Button variant="outline" size="sm" onClick={insertChecklistItem} aria-label="Insert checklist item">
           <ListChecks aria-hidden /> Checklist item
         </Button>
@@ -276,6 +380,14 @@ export function NoteEditor({ note, onSave, onUpdateMeta, onDelete, onDuplicate, 
             schedule({ title: e.target.value, content })
           }}
           placeholder="Title"
+          // A brand-new note: start typing straight away.
+          autoFocus={!note.title && !note.content}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault()
+              textareaRef.current?.focus()
+            }
+          }}
           className="w-full bg-transparent text-xl font-semibold outline-none placeholder:text-muted-foreground/60"
         />
         <NoteTagsInput tags={tags} suggestions={allTags} onChange={(next) => onUpdateMeta(note.id, { tags: next })} />

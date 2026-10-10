@@ -263,6 +263,21 @@ export const ASSIST_OUTPUT = {
       .max(3),
     tips: z.array(z.string().max(250)).max(5),
     mistakes: z.array(z.string().max(250)).max(4),
+    // Core fields come before the large optional sections: Gemini writes keys in
+    // schema order, so these are never the ones lost to the output-token limit.
+    practice: z
+      .array(
+        z.object({
+          question: z.string().min(1).max(500),
+          options: z.array(z.string().min(1).max(200)).length(4),
+          answerIndex: z.number().int().min(0).max(3),
+          explanation: z.string().max(500),
+        })
+      )
+      .min(2)
+      .max(4),
+    summary: z.array(z.string().max(250)).min(2).max(6),
+    nextTopics: z.array(z.string().max(80)).max(4),
     studyGuide: z
       .array(
         z.object({
@@ -360,19 +375,6 @@ export const ASSIST_OUTPUT = {
       )
       .max(20)
       .optional(),
-    practice: z
-      .array(
-        z.object({
-          question: z.string().min(1).max(500),
-          options: z.array(z.string().min(1).max(200)).length(4),
-          answerIndex: z.number().int().min(0).max(3),
-          explanation: z.string().max(500),
-        })
-      )
-      .min(2)
-      .max(4),
-    summary: z.array(z.string().max(250)).min(2).max(6),
-    nextTopics: z.array(z.string().max(80)).max(4),
   }),
   /** Input JSON: { theme, idea?, age, pages, language } — an illustrated picture-book story. */
   "story-book": z.object({

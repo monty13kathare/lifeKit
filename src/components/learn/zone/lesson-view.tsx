@@ -35,7 +35,7 @@ import {
 } from "lucide-react"
 import { z } from "zod"
 import { CopyButton } from "@/components/common/copy-button"
-import { RichText, stripMarkdown } from "@/components/common/rich-text"
+import { InlineText, RichText, stripMarkdown } from "@/components/common/rich-text"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { getLessonSubject, LEVELS, STYLES } from "@/data/learn/lesson-subjects"
@@ -82,7 +82,8 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
     d.examModules?.length && { id: "lesson-modules", label: t("Modules", "मॉड्यूल") },
     d.syllabus?.length && { id: "lesson-syllabus", label: t("Syllabus", "सिलेबस") },
     d.studyGuide?.length && { id: "lesson-guide", label: t("Study guide", "गाइड") },
-    { id: "lesson-ideas", label: t("Key ideas", "मुख्य बातें") },
+    d.story?.text?.trim() && { id: "lesson-story", label: t("Story", "कहानी") },
+    d.keyIdeas.length > 0 && { id: "lesson-ideas", label: t("Key ideas", "मुख्य बातें") },
     d.examples.length > 0 && { id: "lesson-examples", label: t("Examples", "उदाहरण") },
     d.practice.length > 0 && { id: "lesson-quiz", label: t("Quick check", "जाँच") },
     aiEnabled && { id: "lesson-ask", label: t("Ask a doubt", "सवाल पूछें") },
@@ -154,14 +155,18 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
             )}
           </div>
           <h1 className="mt-3 text-2xl leading-tight font-bold tracking-tight text-balance sm:text-3xl">{d.title}</h1>
-          <p className="mt-2 leading-relaxed text-muted-foreground">{d.intro}</p>
+          <p className="mt-2 leading-relaxed whitespace-pre-line text-muted-foreground">
+            <InlineText text={d.intro} />
+          </p>
 
           {d.metadata && d.metadata.length > 0 && (
             <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-3">
               {d.metadata.map((meta, i) => (
                 <div key={i} className="flex min-w-0 flex-col rounded-xl border bg-background/50 p-2.5">
                   <span className="text-[0.7rem] font-medium tracking-wider text-muted-foreground uppercase">{meta.key}</span>
-                  <span className="mt-0.5 text-sm font-semibold wrap-break-word">{meta.value}</span>
+                  <span className="mt-0.5 text-sm font-semibold wrap-break-word">
+                    <InlineText text={meta.value} />
+                  </span>
                 </div>
               ))}
             </div>
@@ -187,7 +192,7 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
       )}
 
       {/* Tables (exam patterns, comparisons) — cards on mobile, a table from sm up */}
-      {d.tables?.map((table, i) => (
+      {d.tables?.map(normalizeTable).filter((table) => table.rows.length > 0).map((table, i) => (
         <Section key={i} icon={Grid} tone="sky" title={table.title}>
           <div className="space-y-2 sm:hidden">
             {table.rows.map((row, r) => (
@@ -195,7 +200,9 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
                 {row.map((cell, c) => (
                   <div key={c} className={cn("flex gap-3 py-1", c > 0 && "border-t border-dashed")}>
                     <dt className="w-2/5 shrink-0 text-xs font-medium text-muted-foreground">{table.columns[c]}</dt>
-                    <dd className={cn("min-w-0 wrap-break-word whitespace-pre-line", c === 0 && "font-semibold")}>{cell}</dd>
+                    <dd className={cn("min-w-0 wrap-break-word whitespace-pre-line", c === 0 && "font-semibold")}>
+                      <InlineText text={cell} />
+                    </dd>
                   </div>
                 ))}
               </dl>
@@ -217,7 +224,7 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
                   <tr key={r} className="transition-colors hover:bg-muted/20">
                     {row.map((cell, c) => (
                       <td key={c} className="px-4 py-3 whitespace-pre-line">
-                        {cell}
+                        <InlineText text={cell} />
                       </td>
                     ))}
                   </tr>
@@ -305,7 +312,11 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
         </Section>
       )}
 
+      {/* Story — first when the learner picked "learn through a story" */}
+      {lesson.style === "story" && <StorySection story={d.story} t={t} />}
+
       {/* Key ideas */}
+      {d.keyIdeas.length > 0 && (
       <Section id="lesson-ideas" icon={Lightbulb} tone="amber" title={t("Key ideas", "मुख्य बातें")}>
         <ol className="space-y-3">
           {d.keyIdeas.map((k, i) => (
@@ -325,6 +336,9 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
           ))}
         </ol>
       </Section>
+      )}
+
+      {lesson.style !== "story" && <StorySection story={d.story} t={t} />}
 
       {/* Method */}
       {d.method.length > 0 && (
@@ -333,7 +347,9 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
             {d.method.map((m, i) => (
               <li key={i} className="flex gap-3 text-sm leading-relaxed">
                 <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-sky-500/12 text-xs font-semibold text-sky-700 dark:text-sky-300">{i + 1}</span>
-                <span className="pt-0.5">{m}</span>
+                <span className="pt-0.5">
+                  <InlineText text={m} />
+                </span>
               </li>
             ))}
           </ol>
@@ -359,7 +375,10 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
               <ul className="space-y-2 text-sm">
                 {d.tips.map((tip, i) => (
                   <li key={i} className="flex gap-2">
-                    <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden /> {tip}
+                    <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+                    <span>
+                      <InlineText text={tip} />
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -370,7 +389,10 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
               <ul className="space-y-2 text-sm">
                 {d.mistakes.map((m, i) => (
                   <li key={i} className="flex gap-2">
-                    <X className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden /> {m}
+                    <X className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
+                    <span>
+                      <InlineText text={m} />
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -416,15 +438,20 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
       {d.practice.length > 0 && <QuickCheck key={lesson.id} lesson={lesson} onDone={onQuizDone} />}
 
       {/* Summary */}
-      <Section icon={BookmarkCheck} tone="indigo" title={t("Key takeaways", "याद रखने वाली बातें")}>
-        <ul className="space-y-2 text-sm">
-          {d.summary.map((s, i) => (
-            <li key={i} className="flex gap-2.5 rounded-xl bg-muted/60 px-3 py-2">
-              <span className="font-semibold text-primary">{i + 1}.</span> {s}
-            </li>
-          ))}
-        </ul>
-      </Section>
+      {d.summary.length > 0 && (
+        <Section icon={BookmarkCheck} tone="indigo" title={t("Key takeaways", "याद रखने वाली बातें")}>
+          <ul className="space-y-2 text-sm">
+            {d.summary.map((s, i) => (
+              <li key={i} className="flex gap-2.5 rounded-xl bg-muted/60 px-3 py-2">
+                <span className="font-semibold text-primary">{i + 1}.</span>
+                <span>
+                  <InlineText text={s} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
 
       {/* Next topics */}
       {aiEnabled && d.nextTopics.length > 0 && (
@@ -448,6 +475,27 @@ export function LessonView({ lesson, saved, aiEnabled, busy, onBack, onSave, onD
 
       {aiEnabled && <AskDoubt key={lesson.id} lesson={lesson} />}
     </article>
+  )
+}
+
+/** AI tables can come back ragged: pad/trim every row to the header, invent a header if missing. */
+function normalizeTable(table: NonNullable<LessonContent["tables"]>[number]) {
+  const width = Math.max(table.columns.length, ...table.rows.map((r) => r.length), 0)
+  const columns = Array.from({ length: width }, (_, i) => table.columns[i]?.trim() || `#${i + 1}`)
+  const rows = table.rows
+    .filter((r) => r.some((c) => c?.trim()))
+    .map((r) => Array.from({ length: width }, (_, i) => r[i] ?? ""))
+  return { title: table.title, columns, rows }
+}
+
+function StorySection({ story, t }: { story: LessonContent["story"] | undefined; t: T }) {
+  if (!story?.text?.trim()) return null
+  return (
+    <Section id="lesson-story" icon={BookOpen} tone="violet" title={story.title?.trim() || t("A short story", "एक छोटी कहानी")}>
+      <div className="rounded-2xl border-l-4 border-violet-400 bg-violet-500/6 px-4 py-3">
+        <RichText text={story.text} />
+      </div>
+    </Section>
   )
 }
 
@@ -483,7 +531,9 @@ function WorkedExample({ n, ex, lang }: { n: number; ex: LessonContent["examples
     <div className="rounded-2xl border bg-background/50 p-4">
       <p className="text-sm leading-relaxed">
         <span className="font-semibold">{tr(lang, { en: `Q${n}. `, hi: `प्रश्न ${n}. ` })}</span>
-        <span className="whitespace-pre-line">{ex.question}</span>
+        <span className="whitespace-pre-line">
+          <InlineText text={ex.question} />
+        </span>
       </p>
       <Button variant="outline" size="sm" className="mt-3 h-10" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
         <ChevronDown className={cn("transition-transform", open && "rotate-180")} aria-hidden />
@@ -494,13 +544,16 @@ function WorkedExample({ n, ex, lang }: { n: number; ex: LessonContent["examples
           <ol className="space-y-1.5 text-sm leading-relaxed">
             {ex.steps.map((s, i) => (
               <li key={i} className="flex gap-2">
-                <span className="font-medium text-muted-foreground">{i + 1}.</span> {s}
+                <span className="font-medium text-muted-foreground">{i + 1}.</span>
+                <span>
+                  <InlineText text={s} />
+                </span>
               </li>
             ))}
           </ol>
           <p className="rounded-xl bg-success/10 px-3 py-2 text-sm font-semibold text-success">
             {tr(lang, { en: "Answer: ", hi: "उत्तर: " })}
-            {ex.answer}
+            <InlineText text={ex.answer} />
           </p>
         </div>
       )}

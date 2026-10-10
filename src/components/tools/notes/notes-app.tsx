@@ -37,6 +37,7 @@ import { useIsDesktop } from "@/hooks/use-media-query"
 import { useNotes } from "@/hooks/use-lifekit-data"
 import { useHydrated } from "@/hooks/use-store"
 import { downloadText, formatBytes } from "@/lib/files"
+import { notesStore } from "@/lib/storage/notes"
 import { cn } from "@/lib/utils"
 import type { EventColor, Note } from "@/types"
 import { NoteEditor, type NoteMetaPatch } from "./note-editor"
@@ -135,9 +136,16 @@ export function NotesApp() {
     setColorFilter(null)
   }
 
+  /** Saves whatever the open editor hasn't saved yet (set by the editor). */
+  const flushEditor = useRef<(() => void) | null>(null)
+
   const createNote = () => {
-    if (active && isBlank(active)) {
-      setSelectedId(active.id)
+    // Save the open note first, then look at its *latest* state: typing and
+    // tapping "New" within the autosave delay must not count as an empty note.
+    flushEditor.current?.()
+    const latest = activeId ? notesStore.get().find((n) => n.id === activeId) : undefined
+    if (latest && isBlank(latest)) {
+      setSelectedId(latest.id)
       return
     }
     const stamp = new Date().toISOString()
@@ -549,6 +557,18 @@ export function NotesApp() {
                 onDelete={deleteNote}
                 onDuplicate={duplicateNote}
                 onBack={isDesktop ? undefined : () => select(null)}
+                onDone={
+                  isDesktop
+                    ? undefined
+                    : () => {
+                        const latest = notesStore.get().find((n) => n.id === active.id)
+                        if (latest && !isBlank(latest)) toast.success("Note saved")
+                        select(null)
+                      }
+                }
+                // Phones have no page-level "New note" button while a note is open.
+                onNew={isDesktop ? undefined : createNote}
+                flushRef={flushEditor}
               />
             </section>
           ) : isDesktop ? (

@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useState } from "react"
-import { ArrowRight, BookOpenCheck, ChevronRight, GraduationCap, Languages, Search, Sparkles, Trash2, Trophy, Signal, Palette, Check } from "lucide-react"
+import { ArrowRight, BookOpenCheck, Check, ChevronRight, CircleAlert, GraduationCap, Languages, Loader2, Palette, RefreshCw, Search, Signal, Sparkles, Trash2, Trophy } from "lucide-react"
 import { toast } from "sonner"
 import { z } from "zod"
 import { Notice } from "@/components/common/notice"
@@ -41,6 +41,8 @@ export function LearningZone({ tabs }: { tabs?: React.ReactNode }) {
   const current = history[history.length - 1] || null
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** The last lesson request, so a failed one can be retried with one tap. */
+  const [lastRequest, setLastRequest] = useState<Parameters<typeof generate> | null>(null)
   const ctlRef = useRef<AbortController | null>(null)
   const t = (en: string, hi: string) => tr(lang, { en, hi })
 
@@ -52,6 +54,7 @@ export function LearningZone({ tabs }: { tabs?: React.ReactNode }) {
       setError(parsed.error.issues[0].message)
       return
     }
+    setLastRequest([subject, rawTopic, opts])
     const lessonLang = opts.language ?? lang
     const lessonLevel = opts.level ?? level
     const lessonStyle = opts.style ?? style
@@ -74,8 +77,8 @@ export function LearningZone({ tabs }: { tabs?: React.ReactNode }) {
     } catch (err) {
       if ((err as Error)?.name === "AbortError") return
       const message = err instanceof Error ? err.message : "Couldn't create the lesson."
+      // Shown once, inline, with a retry button (no duplicate toast).
       setError(message)
-      toast.error("Couldn't create the lesson", { description: message })
     } finally {
       if (ctlRef.current === ctl) setLoading(false)
     }
@@ -200,7 +203,15 @@ export function LearningZone({ tabs }: { tabs?: React.ReactNode }) {
                   </Notice>
                 )
               )}
-              {error && <p className="text-sm text-destructive">{error}</p>}
+              {error && (
+                <LessonError
+                  message={error}
+                  retryLabel={t("Try again", "फिर से कोशिश करें")}
+                  title={t("Couldn't create the lesson", "पाठ नहीं बन पाया")}
+                  busy={loading}
+                  onRetry={lastRequest ? () => void generate(...lastRequest) : undefined}
+                />
+              )}
 
               {/* Options */}
               {aiEnabled && (
@@ -361,7 +372,15 @@ export function LearningZone({ tabs }: { tabs?: React.ReactNode }) {
                 <Sparkles aria-hidden /> {t("Learn", "सीखें")}
               </Button>
             </form>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && (
+                <LessonError
+                  message={error}
+                  retryLabel={t("Try again", "फिर से कोशिश करें")}
+                  title={t("Couldn't create the lesson", "पाठ नहीं बन पाया")}
+                  busy={loading}
+                  onRetry={lastRequest ? () => void generate(...lastRequest) : undefined}
+                />
+              )}
           </div>
         )}
       </ResponsiveSheet>
@@ -420,6 +439,37 @@ function LessonLoading({ lang, onCancel }: { lang: AiLanguage; onCancel: () => v
       <Button variant="ghost" onClick={onCancel}>
         {tr(lang, { en: "Cancel", hi: "रद्द करें" })}
       </Button>
+    </div>
+  )
+}
+
+function LessonError({
+  message,
+  title,
+  retryLabel,
+  busy,
+  onRetry,
+}: {
+  message: string
+  title: string
+  retryLabel: string
+  busy: boolean
+  onRetry?: () => void
+}) {
+  return (
+    <div role="alert" className="flex flex-col gap-3 rounded-2xl border border-destructive/30 bg-destructive/8 p-3 sm:flex-row sm:items-center">
+      <div className="flex min-w-0 flex-1 items-start gap-2.5">
+        <CircleAlert className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
+        <div className="min-w-0 text-sm">
+          <p className="font-medium text-destructive">{title}</p>
+          <p className="mt-0.5 text-muted-foreground">{message}</p>
+        </div>
+      </div>
+      {onRetry && (
+        <Button variant="outline" className="shrink-0" onClick={onRetry} disabled={busy}>
+          {busy ? <Loader2 className="animate-spin" aria-hidden /> : <RefreshCw aria-hidden />} {retryLabel}
+        </Button>
+      )}
     </div>
   )
 }
