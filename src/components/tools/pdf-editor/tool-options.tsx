@@ -263,7 +263,12 @@ export function ToolOptions({
             onChange={(highlightColor) => onSettings({ highlightColor })}
           />
         </div>
-        {!compact && <p className="text-xs text-muted-foreground">Drag across the page to highlight an area.</p>}
+        {!compact && (
+          <p className="text-xs text-muted-foreground">
+            Tap a word to highlight it, or drag across text to select words and lines — highlights snap to the text. Drag on empty
+            space to highlight an area.
+          </p>
+        )}
       </div>
     )
   }

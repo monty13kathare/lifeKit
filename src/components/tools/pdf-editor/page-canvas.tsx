@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { PDFDocumentProxy } from "pdfjs-dist"
 import { LoaderCircle, TriangleAlert } from "lucide-react"
 import {
@@ -66,6 +66,8 @@ interface PageCanvasProps {
 type Draft =
   | { kind: "ink"; points: [number, number][] }
   | { kind: "highlight"; start: [number, number]; end: [number, number] }
+  /** Text highlight: from the anchor word to the focus word (indexes into the page's words). */
+  | { kind: "text-highlight"; anchor: number; focus: number }
 
 interface DragState {
   id: string
@@ -126,7 +128,7 @@ export function PageCanvas(props: PageCanvasProps) {
   const saveInlineRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
-    if (tool !== "edit-text") return
+    if (tool !== "edit-text" && tool !== "highlight") return
     let active = true
     loadBlocks(pdf, page.srcIndex)
       .then((list) => active && setBlocksState({ src: page.srcIndex, blocks: list }))
@@ -177,6 +179,35 @@ export function PageCanvas(props: PageCanvasProps) {
         margin,
       })
     )
+  }
+
+  // Word boxes for text-snapping highlights, in reading order.
+  const words = useMemo(() => (blocks ? buildWordIndex(blocks, W, H) : []), [blocks, W, H])
+
+  /**
+   * Word under a page-space point. `strict`: only a word actually under the
+   * finger (with a little slack); otherwise the nearest word on the nearest line.
+   */
+  const hitWord = (pt: [number, number], strict: boolean): number => {
+    if (!words.length) return -1
+    const [px, py] = pt
+    const slackX = 3 / W
+    const slackY = 2 / H
+    let best = -1
+    let bestScore = Infinity
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i]
+      const dy = py < w.y ? w.y - py : py > w.y + w.h ? py - (w.y + w.h) : 0
+      const dx = px < w.x0 ? w.x0 - px : px > w.x1 ? px - w.x1 : 0
+      if (strict && (dy > slackY || dx > slackX)) continue
+      // Lines matter more than columns: stay on the line the finger is on.
+      const score = dy * H * 20 + dx * W
+      if (score < bestScore) {
+        bestScore = score
+        best = i
+      }
+    }
+    return best
   }
 
   const startInlineEdit = (e: React.MouseEvent, block: EditableTextBlock) => {
@@ -530,7 +561,14 @@ export function PageCanvas(props: PageCanvasProps) {
     }
     onSelect(null)
     e.currentTarget.setPointerCapture(e.pointerId)
-    const d: Draft = tool === "draw" ? { kind: "ink", points: [p] } : { kind: "highlight", start: p, end: p }
+    // Highlight starting on text selects words like a text selection; elsewhere it draws a box.
+    const word = tool === "highlight" ? hitWord(p, true) : -1
+    const d: Draft =
+      tool === "draw"
+        ? { kind: "ink", points: [p] }
+        : word >= 0
+          ? { kind: "text-highlight", anchor: word, focus: word }
+          : { kind: "highlight", start: p, end: p }
     draftRef.current = d
     setDraft(d)
   }
@@ -569,6 +607,12 @@ export function PageCanvas(props: PageCanvasProps) {
       const next: Draft = { kind: "ink", points: pts }
       draftRef.current = next
       setDraft(next)
+    } else if (d.kind === "text-highlight") {
+      const focus = hitWord(toPage(e.clientX, e.clientY), false)
+      if (focus < 0 || focus === d.focus) return
+      const next: Draft = { ...d, focus }
+      draftRef.current = next
+      setDraft(next)
     } else {
       const next: Draft = { ...d, end: toPage(e.clientX, e.clientY) }
       draftRef.current = next
@@ -594,6 +638,13 @@ export function PageCanvas(props: PageCanvasProps) {
     if (!d || cancelled) return
     if (d.kind === "ink") {
       onAdd({ id: uid("ann"), type: "ink", points: d.points, color: settings.penColor, width: settings.penWidth })
+    } else if (d.kind === "text-highlight") {
+      // One highlight per line of the selection, added as a single undo step.
+      const rects = selectionRects(words, d.anchor, d.focus)
+      if (!rects.length) return
+      const base = snapshot()
+      for (const r of rects) onAdd({ id: uid("ann"), type: "highlight", ...r, color: settings.highlightColor }, { record: false })
+      onCommit(base)
     } else {
       const x = Math.min(d.start[0], d.end[0])
       const y = Math.min(d.start[1], d.end[1])
@@ -804,6 +855,19 @@ export function PageCanvas(props: PageCanvasProps) {
               strokeLinejoin="round"
             />
           )}
+          {draft?.kind === "text-highlight" &&
+            selectionRects(words, draft.anchor, draft.focus).map((r, i) => (
+              <rect
+                key={i}
+                x={r.x * W}
+                y={r.y * H}
+                width={r.w * W}
+                height={r.h * H}
+                fill={settings.highlightColor}
+                fillOpacity={0.4}
+                style={{ mixBlendMode: "multiply" }}
+              />
+            ))}
           {draftRect && (
             <rect
               x={draftRect.x}
@@ -1533,4 +1597,57 @@ function InlineBlockEditor({
       </span>
     </div>
   )
+}
+
+// ---- Text-snapping highlights ---------------------------------------------------
+
+interface WordBox {
+  /** Normalised page-space box. */
+  x0: number
+  x1: number
+  y: number
+  h: number
+  /** Index of its line in reading order. */
+  line: number
+}
+
+/** Every word on the page, in reading order, positioned with the original font's metrics. */
+function buildWordIndex(blocks: EditableTextBlock[], W: number, H: number): WordBox[] {
+  const lines = blocks
+    .flatMap((b) => b.lines.map((l) => ({ b, l })))
+    .sort((a, c) => (Math.abs(a.l.baselineY - c.l.baselineY) * H < 2 ? a.l.x - c.l.x : a.l.baselineY - c.l.baselineY))
+  const out: WordBox[] = []
+  lines.forEach(({ b, l }, lineIndex) => {
+    const face = hasFontFace(b.fontFace) ? b.fontFace : undefined
+    const full = measureWidth(l.str, b, face, b.fontSize)
+    // Scale measured widths to the line's real width (covers justification and font differences).
+    const k = full > 0 ? (l.w * W) / full : 1
+    const re = /\S+/g
+    let m: RegExpExecArray | null
+    while ((m = re.exec(l.str))) {
+      const start = measureWidth(l.str.slice(0, m.index), b, face, b.fontSize) * k
+      const end = measureWidth(l.str.slice(0, m.index + m[0].length), b, face, b.fontSize) * k
+      out.push({ x0: l.x + start / W, x1: l.x + end / W, y: l.y, h: l.h, line: lineIndex })
+    }
+  })
+  return out
+}
+
+/** Highlight rectangles (one per line) for the words between two indexes, inclusive. */
+function selectionRects(words: WordBox[], a: number, b: number) {
+  if (a < 0 || b < 0 || !words.length) return []
+  const [from, to] = a <= b ? [a, b] : [b, a]
+  const byLine: Record<number, { x0: number; x1: number; y: number; h: number }> = {}
+  for (let i = from; i <= to && i < words.length; i++) {
+    const w = words[i]
+    const r = byLine[w.line]
+    if (!r) byLine[w.line] = { x0: w.x0, x1: w.x1, y: w.y, h: w.h }
+    else {
+      r.x0 = Math.min(r.x0, w.x0)
+      r.x1 = Math.max(r.x1, w.x1)
+      r.y = Math.min(r.y, w.y)
+      r.h = Math.max(r.h, w.h)
+    }
+  }
+  return Object.values(byLine).map((r) => ({ x: r.x0, y: r.y, w: Math.max(0.001, r.x1 - r.x0), h: r.h }))
 }
