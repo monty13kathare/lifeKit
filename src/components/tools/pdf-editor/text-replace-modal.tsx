@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { replaceFontCss } from "@/lib/pdf/edit"
 import { cn } from "@/lib/utils"
 
 export interface TextReplaceValues {
@@ -21,6 +22,8 @@ export interface TextReplaceValues {
   fontSize: number
   fontFamily: "sans" | "serif" | "mono"
   fontWeight: "normal" | "bold"
+  /** Draw with the PDF's own embedded font. */
+  useOriginalFont: boolean
   textColor: string
   bgColor: string
 }
@@ -32,6 +35,8 @@ interface TextReplaceModalProps {
   onClose: () => void
   originalText: string
   initialValues: TextReplaceValues
+  /** The original embedded font, when the browser has it loaded. */
+  originalFont?: { face: string; fallback?: string; name?: string }
   onApply: (values: TextReplaceValues) => void
   onErase?: () => void
 }
@@ -41,6 +46,7 @@ export function TextReplaceModal({
   onClose,
   originalText,
   initialValues,
+  originalFont,
   onApply,
   onErase,
 }: TextReplaceModalProps) {
@@ -48,6 +54,7 @@ export function TextReplaceModal({
   const [fontSize, setFontSize] = useState(initialValues.fontSize)
   const [fontFamily, setFontFamily] = useState<"sans" | "serif" | "mono">(initialValues.fontFamily)
   const [fontWeight, setFontWeight] = useState<"normal" | "bold">(initialValues.fontWeight)
+  const [useOriginalFont, setUseOriginalFont] = useState(Boolean(originalFont) && initialValues.useOriginalFont)
   const [textColor, setTextColor] = useState(initialValues.textColor)
   const [bgColor, setBgColor] = useState(initialValues.bgColor)
 
@@ -66,6 +73,7 @@ export function TextReplaceModal({
       fontSize: safeFontSize,
       fontFamily,
       fontWeight,
+      useOriginalFont,
       textColor: safeTextColor,
       bgColor: safeBgColor,
     })
@@ -81,6 +89,7 @@ export function TextReplaceModal({
         fontSize: safeFontSize,
         fontFamily,
         fontWeight,
+        useOriginalFont,
         textColor: safeTextColor,
         bgColor: safeBgColor,
       })
@@ -88,12 +97,13 @@ export function TextReplaceModal({
     onClose()
   }
 
-  const fontCss =
-    fontFamily === "serif"
-      ? "'Times New Roman', Times, Georgia, serif"
-      : fontFamily === "mono"
-        ? "'Courier New', Courier, monospace"
-        : "Helvetica, Arial, 'Liberation Sans', sans-serif"
+  const fontCss = replaceFontCss({
+    fontFace: originalFont?.face,
+    fontFallback: originalFont?.fallback,
+    fontFamily,
+    useOriginalFont,
+  })
+  const originalName = originalFont?.name?.replace(/^[A-Z]{6}\+/, "") || "Original"
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -104,24 +114,23 @@ export function TextReplaceModal({
               <FilePenLine className="size-5" />
             </div>
             <div>
-              <DialogTitle className="text-base font-semibold">Edit & Replace PDF Text</DialogTitle>
+              <DialogTitle className="text-base font-semibold">Text options</DialogTitle>
               <DialogDescription className="text-xs">
-                Auto-matched font and color for a seamless, undetectable edit.
+                Font, size and colour are matched to the original text.
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
         <form onSubmit={handleApply} noValidate className="space-y-4 pt-1">
-          {/* Auto-matched style summary badge */}
           <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs text-primary">
             <Check className="size-4 shrink-0 text-primary" />
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-medium">
-              <span>Auto-matched:</span>
-              <span className="font-semibold text-foreground">
-                {fontFamily === "sans" ? "Sans-serif" : fontFamily === "serif" ? "Serif" : "Monospace"}
-                {" · "}
-                {fontWeight === "bold" ? "Bold" : "Regular"}
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-medium">
+              <span>Matched:</span>
+              <span className="truncate font-semibold text-foreground">
+                {useOriginalFont
+                  ? `${originalName} (from this PDF)`
+                  : `${fontFamily === "sans" ? "Sans-serif" : fontFamily === "serif" ? "Serif" : "Monospace"} · ${fontWeight === "bold" ? "Bold" : "Regular"}`}
                 {" · "}
                 {fontSize}pt
               </span>
@@ -178,7 +187,7 @@ export function TextReplaceModal({
                   color: safeTextColor,
                   fontSize: `${Math.min(28, Math.max(12, fontSize))}px`,
                   fontFamily: fontCss,
-                  fontWeight: fontWeight === "bold" ? "bold" : "normal",
+                  fontWeight: useOriginalFont ? "normal" : fontWeight,
                   lineHeight: 1.2,
                 }}
                 className="whitespace-pre-wrap break-words"
@@ -193,43 +202,46 @@ export function TextReplaceModal({
             {/* Font Family */}
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Font Family</Label>
-              <div className="grid grid-cols-3 gap-1">
-                <button
-                  type="button"
-                  onClick={() => setFontFamily("sans")}
-                  className={cn(
-                    "h-10 rounded-md border text-xs font-medium transition-colors",
-                    fontFamily === "sans"
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "bg-surface hover:bg-muted"
-                  )}
-                >
-                  Sans
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFontFamily("serif")}
-                  className={cn(
-                    "h-10 rounded-md border text-xs font-medium font-serif transition-colors",
-                    fontFamily === "serif"
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "bg-surface hover:bg-muted"
-                  )}
-                >
-                  Serif
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFontFamily("mono")}
-                  className={cn(
-                    "h-10 rounded-md border text-xs font-medium font-mono transition-colors",
-                    fontFamily === "mono"
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "bg-surface hover:bg-muted"
-                  )}
-                >
-                  Mono
-                </button>
+              <div className={cn("grid gap-1", originalFont ? "grid-cols-4" : "grid-cols-3")}>
+                {originalFont && (
+                  <button
+                    type="button"
+                    aria-pressed={useOriginalFont}
+                    onClick={() => setUseOriginalFont(true)}
+                    title={`Use the PDF's own font (${originalName})`}
+                    className={cn(
+                      "h-10 truncate rounded-md border px-1 text-xs font-medium transition-colors",
+                      useOriginalFont ? "border-primary bg-primary/10 text-primary" : "bg-surface hover:bg-muted"
+                    )}
+                  >
+                    Original
+                  </button>
+                )}
+                {([
+                  ["sans", "Sans", ""],
+                  ["serif", "Serif", "font-serif"],
+                  ["mono", "Mono", "font-mono"],
+                ] as const).map(([value, label, cls]) => {
+                  const active = !useOriginalFont && fontFamily === value
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => {
+                        setUseOriginalFont(false)
+                        setFontFamily(value)
+                      }}
+                      className={cn(
+                        "h-10 rounded-md border text-xs font-medium transition-colors",
+                        cls,
+                        active ? "border-primary bg-primary/10 text-primary" : "bg-surface hover:bg-muted"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
@@ -240,9 +252,10 @@ export function TextReplaceModal({
                 <button
                   type="button"
                   aria-pressed={fontWeight === "bold"}
+                  disabled={useOriginalFont}
                   onClick={() => setFontWeight((w) => (w === "bold" ? "normal" : "bold"))}
                   className={cn(
-                    "size-10 shrink-0 rounded-md border flex items-center justify-center transition-colors",
+                    "size-10 shrink-0 rounded-md border flex items-center justify-center transition-colors disabled:opacity-40",
                     fontWeight === "bold"
                       ? "border-primary bg-primary/10 text-primary"
                       : "bg-surface hover:bg-muted"

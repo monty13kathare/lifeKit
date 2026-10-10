@@ -73,7 +73,7 @@ export function PdfEditor() {
       if (!head.includes("%PDF")) throw Object.assign(new Error("Not a PDF"), { name: "NotAPdf" })
       setPhase({ status: "loading", label: "Opening PDF…", progress: null })
       // pdf.js transfers (detaches) its buffer, so hand it a copy.
-      const pdf = await openPdf(bytes.slice(0))
+      const pdf = await openPdf(bytes.slice(0), { keepFontData: true })
       if (id !== loadId.current) {
         void pdf.destroy()
         return

@@ -2,12 +2,14 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { PDFDocumentProxy } from "pdfjs-dist"
-import { LoaderCircle, TriangleAlert } from "lucide-react"
+import { Check, LoaderCircle, Minus, Plus, TriangleAlert, Type } from "lucide-react"
 import {
   normalizeRotation,
   pageNumberLabel,
   PAGE_NUMBER_MARGIN,
   PDF_FONT_STACK,
+  replaceFontCss,
+  TEXT_BASELINE,
   TEXT_LINE_HEIGHT,
   viewToPage,
   visualSize,
@@ -19,14 +21,16 @@ import {
   type TextReplaceAnnotation,
   type WatermarkSettings,
 } from "@/lib/pdf/edit"
+import { loadLookalikeFile, lookalikeFontId } from "@/lib/pdf/font-info"
 import { cn } from "@/lib/utils"
 import { capScale, renderPage } from "./pdf-render"
 import { uid, type ApplyOptions, type DocState } from "./use-editor-state"
 import type { Tool, ToolSettings } from "./types"
 import {
-  extractPageTextItems,
+  extractEditableBlocks,
   sampleColorsFromCanvas,
-  type ExtractedTextItem,
+  type EditableLine,
+  type EditableTextBlock,
 } from "./text-replace-helper"
 import { TextReplaceModal, type TextReplaceValues } from "./text-replace-modal"
 
@@ -51,7 +55,9 @@ interface PageCanvasProps {
   onFinishEditing: () => void
   onAdd: (a: Annotation, opts?: ApplyOptions) => void
   onUpdate: (id: string, patch: Partial<Annotation>, opts?: ApplyOptions) => void
-  onRemove: (id: string) => void
+  onRemove: (id: string, opts?: ApplyOptions) => void
+  /** Record one undo step for changes applied since `base` with `record: false`. */
+  onCommit: (base: DocState) => void
   /** Snapshot of the current document, used as the undo base for drags. */
   snapshot: () => DocState
 }
@@ -92,6 +98,7 @@ export function PageCanvas(props: PageCanvasProps) {
     onAdd,
     onUpdate,
     onRemove,
+    onCommit,
     snapshot,
   } = props
   const outerRef = useRef<HTMLDivElement>(null)
@@ -108,150 +115,198 @@ export function PageCanvas(props: PageCanvasProps) {
   const [VW, VH] = visualSize(page)
   const rot = page.rotation
 
-  // ---- Text Layer & Replacement State -----------------------------------
-  const [textItems, setTextItems] = useState<ExtractedTextItem[]>([])
-  type ModalTarget =
-    | {
-        mode: "create"
-        item: ExtractedTextItem
-        originalText: string
-        initialValues: TextReplaceValues
-      }
-    | {
-        mode: "edit"
-        annotation: TextReplaceAnnotation
-        originalText: string
-        initialValues: TextReplaceValues
-      }
-    | null
-
-  const [modalTarget, setModalTarget] = useState<ModalTarget>(null)
+  // ---- Editable text (Edit text tool) -----------------------------------
+  const [blocksState, setBlocksState] = useState<{ src: number; blocks: EditableTextBlock[] } | null>(null)
+  const blocks = blocksState?.src === page.srcIndex ? blocksState.blocks : null
+  const [inline, setInline] = useState<InlineSession | null>(null)
+  const [modalId, setModalId] = useState<string | null>(null)
 
   useEffect(() => {
+    if (tool !== "edit-text") return
     let active = true
-    pdf.getPage(page.srcIndex + 1)
-      .then((p) => p.getTextContent())
-      .then((tc) => {
-        if (!active) return
-        setTextItems(extractPageTextItems(tc, W, H))
+    loadBlocks(pdf, page.srcIndex)
+      .then((list) => active && setBlocksState({ src: page.srcIndex, blocks: list }))
+      .catch((err) => {
+        console.error("[PDF text extraction]", err)
+        if (active) setBlocksState({ src: page.srcIndex, blocks: [] })
       })
-      .catch((err) => console.error("[PDF Text Layer Extraction Error]", err))
     return () => {
       active = false
     }
-  }, [pdf, page.srcIndex, W, H])
+  }, [pdf, page.srcIndex, tool])
 
-  const handleTextItemClick = (e: React.MouseEvent, item: ExtractedTextItem) => {
+  const replaceAnns = annotations.filter((a): a is TextReplaceAnnotation => a.type === "text-replace")
+  const annsForBlock = (block: EditableTextBlock) =>
+    replaceAnns.filter((a) => a.sourceId === block.id || a.sourceId?.startsWith(`${block.id}-l`))
+
+  /** Current text of a block: original lines, with any saved replacements applied. */
+  const currentText = (block: EditableTextBlock) => {
+    const anns = annsForBlock(block)
+    const whole = anns.find((a) => a.sourceId === block.id)
+    if (whole) return whole.text
+    return block.lines.map((l) => anns.find((a) => a.sourceId === l.id)?.text ?? l.str).join("\n")
+  }
+
+  const startInlineEdit = (e: React.MouseEvent, block: EditableTextBlock) => {
     e.stopPropagation()
+    if (editingId) onFinishEditing()
     const canvas = hostRef.current?.querySelector("canvas") || null
-    const colors = sampleColorsFromCanvas(canvas, item.x, item.y, item.w, item.h)
+    const sampled = sampleColorsFromCanvas(canvas, block.x, block.y, block.w, block.h)
+    const existing = annsForBlock(block)[0]
+    const text = currentText(block)
+    const fontFace = hasFontFace(block.fontFace) ? block.fontFace : undefined
 
-    setModalTarget({
-      mode: "create",
-      item,
-      originalText: item.str,
-      initialValues: {
-        text: item.str,
-        fontSize: item.fontSize,
-        fontFamily: item.fontFamily,
-        fontWeight: item.fontWeight,
-        textColor: colors.textColor,
-        bgColor: colors.bgColor,
-      },
+    // Put the caret where the user clicked, measured in the original font.
+    let caret = text.length
+    const r = outerRef.current?.getBoundingClientRect()
+    if (r && rot === 0) {
+      const px = ((e.clientX - r.left) / r.width) * W
+      const py = ((e.clientY - r.top) / r.height) * H
+      const textLines = text.split("\n")
+      const li = clamp(Math.floor((py - block.y * H) / block.lineGap), 0, textLines.length - 1)
+      const x0 = (block.lines[Math.min(li, block.lines.length - 1)]?.x ?? block.x) * W
+      caret = textLines.slice(0, li).reduce((n, l) => n + l.length + 1, 0) + caretColumn(textLines[li], px - x0, block, fontFace)
+    }
+
+    onSelect(null)
+    setInline({
+      block,
+      text,
+      caret,
+      color: existing?.color ?? block.color ?? sampled.textColor,
+      bgColor: existing?.bgColor ?? sampled.bgColor,
+      fontSize: existing?.fontSize ?? block.fontSize,
+      fontFace,
     })
   }
 
-  const editTargetFor = (a: TextReplaceAnnotation): ModalTarget => ({
-    mode: "edit",
-    annotation: a,
-    originalText: a.originalText || a.text,
-    initialValues: {
-      text: a.text,
-      fontSize: a.fontSize,
-      fontFamily: a.fontFamily,
-      fontWeight: a.fontWeight,
-      textColor: a.color,
-      bgColor: a.bgColor,
-    },
+  const replaceAnnotation = (
+    s: InlineSession,
+    style: InlineStyle,
+    part: { sourceId: string; x: number; y: number; w: number; h: number; baselineY: number; original: string },
+    text: string
+  ): TextReplaceAnnotation => ({
+    id: uid("ann"),
+    type: "text-replace",
+    sourceId: part.sourceId,
+    stripLines: s.block.lines
+      .filter((l) => part.sourceId === s.block.id || l.id === part.sourceId)
+      .map((l) => ({ x: l.x, w: l.w, baselineY: l.baselineY, size: s.block.fontSize })),
+    x: part.x,
+    y: part.y,
+    w: part.w,
+    h: part.h,
+    baselineY: part.baselineY,
+    text,
+    originalText: part.original,
+    fontSize: style.fontSize,
+    color: style.color,
+    bgColor: s.bgColor,
+    fontFamily: s.block.fontFamily,
+    fontWeight: s.block.fontWeight,
+    rotation: 0,
+    pdfFontName: s.block.pdfFontName || undefined,
+    fontFace: s.fontFace,
+    fontFallback: s.block.fontFallback,
+    fontRealFamily: s.block.realFamily,
+    fontWeightValue: s.block.weight,
+    italic: s.block.italic,
+    faceWeighted: s.block.faceWeighted,
+    useOriginalFont: true,
+    matrix: s.block.matrix,
+    lineGap: s.block.lineGap * (style.fontSize / s.block.fontSize),
+    ascent: s.block.ascent,
+    descent: s.block.descent,
+    // Keep a justified line's wider word spacing on screen (single lines only).
+    wordSpacing: part.sourceId === s.block.id && s.block.lines.length > 1 ? undefined : justifiedSpacing(
+      s.block.lines.find((l) => l.id === part.sourceId) ?? s.block.lines[0], s.block, s.fontFace, W
+    ) || undefined,
   })
 
+  /**
+   * Save an inline edit. Lines that didn't change are left untouched in the
+   * original PDF; only edited lines get covered and redrawn.
+   */
+  const commitInline = (s: InlineSession, text: string, style: InlineStyle) => {
+    setInline(null)
+    const { block } = s
+    const base = snapshot()
+    const anns = annsForBlock(block)
+    const whole = anns.find((a) => a.sourceId === block.id)
+    const newLines = text.replace(/\r\n/g, "\n").split("\n")
+    const original = block.lines.map((l) => l.str)
+    const restyled = style.color !== s.color || style.fontSize !== s.fontSize
+    const stylePatch = { color: style.color, fontSize: style.fontSize, lineGap: block.lineGap * (style.fontSize / block.fontSize) }
+    // An untouched line in the original colour/size needs no replacement at all.
+    const pristine = style.fontSize === block.fontSize && (!block.color || style.color === block.color)
+    let changed = false
+    const add = (a: TextReplaceAnnotation) => {
+      onAdd(a, { record: false })
+      changed = true
+    }
+    const remove = (id: string) => {
+      onRemove(id, { record: false })
+      changed = true
+    }
+    const update = (a: TextReplaceAnnotation, next: string) => {
+      if (a.text === next && !restyled) return
+      onUpdate(a.id, { text: next, ...stylePatch }, { record: false })
+      changed = true
+    }
+
+    if (whole || newLines.length !== original.length) {
+      const lineAnns = anns.filter((a) => a !== whole)
+      lineAnns.forEach((a) => remove(a.id))
+      const same = newLines.length === original.length && newLines.every((l, i) => l === original[i])
+      if (same && pristine) {
+        if (whole) remove(whole.id)
+      } else if (whole) {
+        update(whole, text)
+      } else {
+        const first = block.lines[0]
+        add(
+          replaceAnnotation(
+            s,
+            style,
+            { sourceId: block.id, x: block.x, y: block.y, w: block.w, h: block.h, baselineY: first.baselineY, original: original.join("\n") },
+            text
+          )
+        )
+      }
+    } else {
+      block.lines.forEach((line, i) => {
+        const next = newLines[i]
+        const ex = anns.find((a) => a.sourceId === line.id)
+        if (next === line.str && pristine) {
+          if (ex) remove(ex.id)
+        } else if (ex) {
+          update(ex, next)
+        } else if (next !== line.str || restyled) {
+          add(replaceAnnotation(s, style, { ...line, sourceId: line.id, original: line.str }, next))
+        }
+      })
+    }
+    if (changed) onCommit(base)
+  }
+
+  // Side-panel "Edit text" / double-click opens the detailed options dialog.
+  const modalAnn = replaceAnns.find((a) => a.id === (modalId ?? editingId))
   const handleEditExistingReplace = (a: TextReplaceAnnotation) => {
     onSelect(a.id)
-    setModalTarget(editTargetFor(a))
+    setModalId(a.id)
   }
-
-  // "Edit" from the toolbar sets editingId on a replaced-text annotation:
-  // derive the modal from it instead of syncing state in an effect.
-  const editingReplace = editingId
-    ? (annotations.find((x) => x.id === editingId && x.type === "text-replace") as TextReplaceAnnotation | undefined)
-    : undefined
-  const activeModal: ModalTarget = modalTarget ?? (editingReplace ? editTargetFor(editingReplace) : null)
 
   const handleApplyReplace = (values: TextReplaceValues) => {
-    if (!activeModal) return
-
-    if (activeModal.mode === "create") {
-      const lenRatio = values.text.length / Math.max(1, activeModal.originalText.length)
-      const w = Math.min(1 - activeModal.item.x, Math.max(activeModal.item.w, activeModal.item.w * lenRatio))
-
-      const a: TextReplaceAnnotation = {
-        id: uid("ann"),
-        type: "text-replace",
-        x: activeModal.item.x,
-        y: activeModal.item.y,
-        w,
-        h: activeModal.item.h,
-        baselineY: activeModal.item.baselineY,
-        text: values.text,
-        originalText: activeModal.originalText,
-        fontSize: values.fontSize,
-        fontFamily: values.fontFamily,
-        fontWeight: values.fontWeight,
-        color: values.textColor,
-        bgColor: values.bgColor,
-        rotation: 0,
-      }
-      onAdd(a)
-      onSelect(a.id)
-    } else {
-      onUpdate(activeModal.annotation.id, {
-        text: values.text,
-        fontSize: values.fontSize,
-        fontFamily: values.fontFamily,
-        fontWeight: values.fontWeight,
-        color: values.textColor,
-        bgColor: values.bgColor,
-      })
-    }
-  }
-
-  const handleEraseReplace = () => {
-    if (!activeModal) return
-    if (activeModal.mode === "create") {
-      const a: TextReplaceAnnotation = {
-        id: uid("ann"),
-        type: "text-replace",
-        x: activeModal.item.x,
-        y: activeModal.item.y,
-        w: activeModal.item.w,
-        h: activeModal.item.h,
-        baselineY: activeModal.item.baselineY,
-        text: "",
-        originalText: activeModal.originalText,
-        fontSize: activeModal.item.fontSize,
-        fontFamily: activeModal.item.fontFamily,
-        fontWeight: activeModal.item.fontWeight,
-        color: "#ffffff",
-        bgColor: activeModal.initialValues.bgColor || "#ffffff",
-        rotation: 0,
-      }
-      onAdd(a)
-      onSelect(a.id)
-    } else {
-      onUpdate(activeModal.annotation.id, {
-        text: "",
-      })
-    }
+    if (!modalAnn) return
+    onUpdate(modalAnn.id, {
+      text: values.text,
+      fontSize: values.fontSize,
+      fontFamily: values.fontFamily,
+      fontWeight: values.fontWeight,
+      useOriginalFont: values.useOriginalFont,
+      color: values.textColor,
+      bgColor: values.bgColor,
+    })
   }
 
   // ---- Render the (unrotated) page bitmap -------------------------------
@@ -316,8 +371,14 @@ export function PageCanvas(props: PageCanvasProps) {
       }
       case "highlight":
         return { x: clamp(a.x + dx, 0, 1 - a.w), y: clamp(a.y + dy, 0, 1 - a.h) }
-      case "text-replace":
-        return { x: clamp(a.x + dx, 0, 1 - a.w), y: clamp(a.y + dy, 0, 1 - a.h) }
+      case "text-replace": {
+        const y = clamp(a.y + dy, 0, 1 - a.h)
+        return {
+          x: clamp(a.x + dx, 0, 1 - a.w),
+          y,
+          ...(a.baselineY !== undefined ? { baselineY: a.baselineY + (y - a.y) } : {}),
+        }
+      }
       default:
         return { x: clamp(a.x + dx, 0, 1), y: clamp(a.y + dy, 0, 1) }
     }
@@ -713,45 +774,36 @@ export function PageCanvas(props: PageCanvasProps) {
             )
           }
           if (a.type === "text-replace") {
-            const fontCss =
-              a.fontFamily === "serif"
-                ? "'Times New Roman', Times, Georgia, serif"
-                : a.fontFamily === "mono"
-                  ? "'Courier New', Courier, monospace"
-                  : PDF_FONT_STACK
-            const isMultiLine = a.text.includes("\n")
+            // Hidden while its paragraph is open in the inline editor.
+            if (inline && a.sourceId && (a.sourceId === inline.block.id || a.sourceId.startsWith(`${inline.block.id}-l`))) return null
+            const original = Boolean(a.fontFace) && a.useOriginalFont !== false
+            const metrics = lineMetrics(a, H)
             return (
               <div
                 key={a.id}
                 {...common}
-                {...annotationA11y(a, `Replaced text: ${a.text || a.originalText || "empty"}`)}
+                {...annotationA11y(a, `Edited text: ${a.text || a.originalText || "empty"}`)}
                 onDoubleClick={() => handleEditExistingReplace(a)}
-                style={{
-                  ...common.style,
-                  width: `${a.w * 100}%`,
-                  height: isMultiLine ? undefined : `${a.h * 100}%`,
-                  minHeight: `${a.h * 100}%`,
-                }}
-                title="Replaced text. Double-click to edit."
+                style={{ ...common.style, width: `${a.w * 100}%`, height: `${a.h * 100}%` }}
+                title="Edited text. Double-click for font and colour options."
               >
-                {/* 1. Solid background cover that completely erases original text on the canvas */}
-                <div
-                  className="absolute inset-[-2px] rounded-[1px] pointer-events-none"
-                  style={{ backgroundColor: a.bgColor || "#ffffff" }}
-                />
-
-                {/* 2. Replacement text rendered seamlessly on top with matching font and color */}
+                {/* Cover that hides the original glyphs on the rendered page */}
+                <div className="pointer-events-none absolute -inset-px" style={{ backgroundColor: a.bgColor || "#ffffff" }} />
                 <span
-                  className={cn("relative block select-text", isMultiLine ? "whitespace-pre-wrap" : "whitespace-nowrap")}
+                  className="pointer-events-none absolute left-0 whitespace-pre"
                   style={{
-                    fontSize: `${a.fontSize * scale}px`,
-                    lineHeight: isMultiLine ? TEXT_LINE_HEIGHT : `${a.h * H * scale}px`,
+                    top: metrics.top * scale,
+                    fontSize: a.fontSize * scale,
+                    lineHeight: `${metrics.lineGap * scale}px`,
+                    wordSpacing: a.wordSpacing ? a.wordSpacing * scale : undefined,
                     color: a.color,
-                    fontFamily: fontCss,
-                    fontWeight: a.fontWeight === "bold" ? "bold" : "normal",
+                    fontFamily: replaceFontCss(a),
+                    // pdf.js's own face is declared regular; ours carries the real weight/style.
+                    fontWeight: original && !a.faceWeighted ? 400 : (a.fontWeightValue ?? a.fontWeight),
+                    fontStyle: a.italic && (!original || a.faceWeighted) ? "italic" : "normal",
                   }}
                 >
-                  {a.text || " "}
+                  {a.text || " "}
                 </span>
               </div>
             )
@@ -788,46 +840,66 @@ export function PageCanvas(props: PageCanvasProps) {
           )
         })}
 
-        {/* Interactive PDF text layer for replacing existing text. Only in the
-            Edit text tool: in Select mode it sat on top of annotations and
-            stole taps meant for them. */}
-        {tool === "edit-text" && (
-          <div className="pdf-text-layer absolute inset-0 select-text pointer-events-none">
-            {textItems.map((item) => {
-              // Text that was already replaced edits that replacement instead of stacking a new one.
-              const replaced = annotations.find(
-                (a): a is TextReplaceAnnotation =>
-                  a.type === "text-replace" && Math.abs(a.x - item.x) < 1e-4 && Math.abs(a.y - item.y) < 1e-4
-              )
+        {/* Editable text layer: every heading/paragraph on the page is a click target.
+            Only in the Edit text tool, so it doesn't steal taps from annotations. */}
+        {tool === "edit-text" && blocks && (
+          <div className="pdf-text-layer pointer-events-none absolute inset-0">
+            {blocks.map((block) => {
+              if (inline?.block.id === block.id) return null
+              const edited = annsForBlock(block).length > 0
               return (
-                <span
-                  key={item.id}
-                  className="absolute pointer-events-auto cursor-pointer rounded-[2px] transition-all hover:bg-primary/20 hover:ring-1 hover:ring-primary/60 hover:shadow-xs"
+                <button
+                  key={block.id}
+                  type="button"
+                  className={cn(
+                    "pointer-events-auto absolute cursor-text rounded-xs outline-none transition-[box-shadow,background-color]",
+                    "hover:bg-primary/8 hover:ring-1 hover:ring-primary/70 focus-visible:ring-2 focus-visible:ring-primary",
+                    edited && "ring-1 ring-primary/30"
+                  )}
                   style={{
-                    left: `${item.x * 100}%`,
-                    top: `${item.y * 100}%`,
-                    width: `${item.w * 100}%`,
-                    height: `${item.h * 100}%`,
-                    fontSize: `${item.fontSize * scale}px`,
-                    lineHeight: 1,
-                    color: "transparent",
+                    left: `${block.x * 100}%`,
+                    top: `${block.y * 100}%`,
+                    width: `${block.w * 100}%`,
+                    height: `${block.h * 100}%`,
                   }}
-                  title={`Click to edit or replace: "${item.str}"`}
+                  aria-label={`Edit text: ${currentText(block).slice(0, 80)}`}
                   onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    if (replaced) {
-                      e.stopPropagation()
-                      handleEditExistingReplace(replaced)
-                    } else handleTextItemClick(e, item)
-                  }}
-                >
-                  {item.str}
-                </span>
+                  onClick={(e) => startInlineEdit(e, block)}
+                />
               )
             })}
           </div>
         )}
+
+        {inline && (
+          <InlineBlockEditor
+            key={inline.block.id}
+            session={inline}
+            scale={scale}
+            W={W}
+            H={H}
+            onCommit={(text, style) => commitInline(inline, text, style)}
+            onCancel={() => setInline(null)}
+          />
+        )}
       </div>
+
+      {tool === "edit-text" && bitmapSrc === page.srcIndex && (!blocks || blocks.length === 0) && (
+        <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
+          <span className="flex items-center gap-2 rounded-full bg-background/95 px-3 py-1.5 text-xs text-muted-foreground shadow-soft">
+            {!blocks ? (
+              <>
+                <LoaderCircle className="size-3.5 animate-spin" aria-hidden /> Finding editable text…
+              </>
+            ) : (
+              <>
+                <TriangleAlert className="size-3.5 text-warning" aria-hidden /> No editable text on this page — it may be a
+                scanned image.
+              </>
+            )}
+          </span>
+        </div>
+      )}
 
       {/* Document-wide previews, drawn in the visual frame */}
       {watermark.enabled && watermark.text.trim() && (
@@ -882,18 +954,31 @@ export function PageCanvas(props: PageCanvasProps) {
           )}
         </div>
       )}
-      {activeModal && (
+      {modalAnn && (
         <TextReplaceModal
-          key={activeModal.mode === "edit" ? activeModal.annotation.id : `${activeModal.item.x}:${activeModal.item.y}`}
+          key={modalAnn.id}
           open
           onClose={() => {
-            setModalTarget(null)
+            setModalId(null)
             onFinishEditing()
           }}
-          originalText={activeModal.originalText}
-          initialValues={activeModal.initialValues}
+          originalText={modalAnn.originalText ?? modalAnn.text}
+          originalFont={
+            modalAnn.fontFace
+              ? { face: modalAnn.fontFace, fallback: modalAnn.fontFallback, name: modalAnn.pdfFontName }
+              : undefined
+          }
+          initialValues={{
+            text: modalAnn.text,
+            fontSize: modalAnn.fontSize,
+            fontFamily: modalAnn.fontFamily,
+            fontWeight: modalAnn.fontWeight,
+            useOriginalFont: Boolean(modalAnn.fontFace) && modalAnn.useOriginalFont !== false,
+            textColor: modalAnn.color,
+            bgColor: modalAnn.bgColor,
+          }}
           onApply={handleApplyReplace}
-          onErase={handleEraseReplace}
+          onErase={() => onUpdate(modalAnn.id, { text: "" })}
         />
       )}
     </div>
@@ -949,5 +1034,331 @@ function InlineTextEditor({
         style={{ font: "inherit", lineHeight: "inherit", color: "inherit" }}
       />
     </span>
+  )
+}
+
+// ---- Inline text editing ------------------------------------------------------
+
+interface InlineSession {
+  block: EditableTextBlock
+  text: string
+  caret: number
+  color: string
+  bgColor: string
+  fontSize: number
+  /** Set when the original font is loaded in the browser. */
+  fontFace?: string
+}
+
+interface InlineStyle {
+  color: string
+  fontSize: number
+}
+
+const blockCache = new WeakMap<PDFDocumentProxy, Map<number, Promise<EditableTextBlock[]>>>()
+
+/** Extract a page's editable text once per document. */
+function loadBlocks(pdf: PDFDocumentProxy, srcIndex: number) {
+  let byPage = blockCache.get(pdf)
+  if (!byPage) {
+    byPage = new Map()
+    blockCache.set(pdf, byPage)
+  }
+  let job = byPage.get(srcIndex)
+  if (!job) {
+    const map = byPage
+    job = pdf.getPage(srcIndex + 1).then((p) => extractEditableBlocks(p, `p${srcIndex}`))
+    job.catch(() => map.delete(srcIndex))
+    map.set(srcIndex, job)
+  }
+  return job
+}
+
+function hasFontFace(face: string) {
+  try {
+    for (const f of document.fonts) {
+      if (f.family.replace(/^["']|["']$/g, "") === face && f.status === "loaded") return true
+    }
+  } catch {
+    /* FontFaceSet iteration unsupported */
+  }
+  return false
+}
+
+const lookalikeFaces = new Map<string, Promise<string | null>>()
+
+/**
+ * Load the open look-alike font (e.g. Carlito for Calibri) as a web font so
+ * characters missing from the embedded subset preview like they will export.
+ */
+function ensureLookalikeFace(block: EditableTextBlock) {
+  const id = lookalikeFontId(block.realFamily)
+  if (!id || typeof FontFace === "undefined") return Promise.resolve(null)
+  const key = `${id}:${block.weight}:${block.italic}`
+  let job = lookalikeFaces.get(key)
+  if (!job) {
+    job = loadLookalikeFile(id, block.weight, block.italic, "latin")
+      .then(async (file) => {
+        if (!file) return null
+        const family = `lk-fb-${id}`
+        const face = new FontFace(family, file.bytes.slice(), {
+          weight: String(block.weight),
+          style: block.italic ? "italic" : "normal",
+        })
+        await face.load()
+        document.fonts.add(face)
+        return family
+      })
+      .catch(() => null)
+    lookalikeFaces.set(key, job)
+  }
+  return job
+}
+
+/** CSS font for a block: the original face first, then the real family, then its look-alike. */
+function blockFont(block: EditableTextBlock, fontFace: string | undefined) {
+  return {
+    fontFamily: replaceFontCss({
+      fontFace,
+      fontFallback: block.fontFallback,
+      fontFamily: block.fontFamily,
+      fontRealFamily: block.realFamily,
+    }),
+    // pdf.js's own face is declared regular; ours carries the real weight/style.
+    fontWeight: fontFace && !block.faceWeighted ? 400 : block.weight,
+    fontStyle: block.italic && (!fontFace || block.faceWeighted) ? "italic" : "normal",
+  } as const
+}
+
+/** Characters the embedded font doesn't contain (empty when coverage is unknown). */
+function missingChars(text: string, block: EditableTextBlock) {
+  if (!block.coverage.size) return []
+  const out = new Set<string>()
+  for (const ch of Array.from(text)) {
+    if (!/\s/.test(ch) && !block.coverage.has(ch.codePointAt(0)!)) out.add(ch)
+  }
+  return [...out]
+}
+
+/** Extra space width (pt) a justified line was drawn with; 0 for normal spacing. */
+function justifiedSpacing(line: EditableLine, block: EditableTextBlock, fontFace: string | undefined, W: number) {
+  const spaces = (line.str.match(/ /g) ?? []).length
+  if (!spaces || typeof document === "undefined") return 0
+  const ctx = document.createElement("canvas").getContext("2d")
+  if (!ctx) return 0
+  const f = blockFont(block, fontFace)
+  ctx.font = `${f.fontStyle} ${f.fontWeight} ${block.fontSize}px ${f.fontFamily}`
+  const extra = (line.w * W - ctx.measureText(line.str).width * (block.matrix[0] || 1)) / spaces
+  return extra > block.fontSize * 0.03 && extra < block.fontSize ? extra : 0
+}
+
+/** Index in `line` closest to `xPt` points from the line start. */
+function caretColumn(line: string, xPt: number, block: EditableTextBlock, fontFace: string | undefined) {
+  const ctx = document.createElement("canvas").getContext("2d")
+  if (!ctx) return line.length
+  const f = blockFont(block, fontFace)
+  ctx.font = `${f.fontStyle} ${f.fontWeight} ${block.fontSize}px ${f.fontFamily}`
+  const sx = block.matrix[0] || 1
+  let best = 0
+  let bestDist = Infinity
+  for (let i = 0; i <= line.length; i++) {
+    const d = Math.abs(ctx.measureText(line.slice(0, i)).width * sx - xPt)
+    if (d < bestDist) {
+      bestDist = d
+      best = i
+    }
+  }
+  return best
+}
+
+/** Line height and the offset (pt) from the cover top to the first CSS line box. */
+function lineMetrics(
+  a: { fontSize: number; lineGap?: number; ascent?: number; descent?: number; baselineY?: number; y: number },
+  H: number
+) {
+  const lineGap = a.lineGap ?? a.fontSize * TEXT_LINE_HEIGHT
+  const asc = a.ascent ?? 0.8
+  const desc = a.descent ?? 0.2
+  const baseOff = a.baselineY !== undefined ? (a.baselineY - a.y) * H : a.fontSize * TEXT_BASELINE
+  // CSS centres the font's ascent+descent inside each line box.
+  const top = baseOff - ((lineGap - (asc + desc) * a.fontSize) / 2 + asc * a.fontSize)
+  return { lineGap, top }
+}
+
+const stripSubset = (name: string) => name.replace(/^[A-Z]{6}\+/, "")
+
+function InlineBlockEditor({
+  session,
+  scale,
+  W,
+  H,
+  onCommit,
+  onCancel,
+}: {
+  session: InlineSession
+  scale: number
+  W: number
+  H: number
+  onCommit: (text: string, style: InlineStyle) => void
+  onCancel: () => void
+}) {
+  const { block } = session
+  const [value, setValue] = useState(session.text)
+  const [color, setColor] = useState(session.color)
+  const [fontSize, setFontSize] = useState(session.fontSize)
+  const [lookalike, setLookalike] = useState<string | null>(null)
+  const ref = useRef<HTMLTextAreaElement>(null)
+  const done = useRef(false)
+  // The colour input briefly takes focus; that blur isn't "done editing".
+  const inToolbar = useRef(false)
+
+  useLayoutEffect(() => {
+    const focus = () => {
+      const el = ref.current
+      if (!el || document.activeElement === el) return
+      el.focus({ preventScroll: true })
+      el.setSelectionRange(session.caret, session.caret)
+    }
+    focus()
+    const id = window.setTimeout(focus, 0)
+    return () => window.clearTimeout(id)
+  }, [session.caret])
+
+  useEffect(() => {
+    let active = true
+    void ensureLookalikeFace(block).then((family) => active && setLookalike(family))
+    return () => {
+      active = false
+    }
+  }, [block])
+
+  const finish = (cancel: boolean) => {
+    if (done.current) return
+    done.current = true
+    if (cancel) onCancel()
+    else onCommit(value, { color, fontSize })
+  }
+
+  const ratio = fontSize / block.fontSize
+  const metrics = lineMetrics({ ...block, fontSize, lineGap: block.lineGap * ratio, baselineY: block.lines[0].baselineY }, H)
+  const font = blockFont(block, session.fontFace)
+  const x0 = (block.lines[0].x - block.x) * W
+  const wordSpacing = block.lines.length === 1 ? justifiedSpacing(block.lines[0], block, session.fontFace, W) : 0
+  const missing = missingChars(value, block)
+  const fontLabel = (session.fontFace && (block.realFamily || stripSubset(block.pdfFontName))) || "Similar font"
+  const weightLabel = block.weight >= 600 ? " Bold" : ""
+  const lookalikeName = lookalikeFontId(block.realFamily)?.replace(/-/g, " ")
+  const stepSize = (d: number) => setFontSize((s) => Math.max(4, Math.min(144, Math.round((s + d) * 10) / 10)))
+
+  return (
+    <div
+      className="absolute z-20"
+      style={{ left: `${block.x * 100}%`, top: `${block.y * 100}%`, width: `${block.w * 100}%`, height: `${block.h * 100}%` }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      {/* Hide the original glyphs while typing */}
+      <div className="pointer-events-none absolute -inset-px" style={{ backgroundColor: session.bgColor }} />
+
+      {/* Floating toolbar */}
+      <div
+        className="absolute bottom-full left-0 z-10 mb-2 flex w-max max-w-[min(92vw,560px)] flex-wrap items-center gap-1 rounded-xl border bg-popover p-1 text-popover-foreground shadow-soft"
+        onMouseDown={(e) => {
+          // Keep focus in the text box, except for the colour input which needs it.
+          if ((e.target as HTMLElement).tagName !== "INPUT") e.preventDefault()
+          else inToolbar.current = true
+        }}
+      >
+        <span className="flex min-w-0 items-center gap-1.5 px-2 text-xs" title={block.pdfFontName}>
+          <Type className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="max-w-40 truncate font-medium">
+            {fontLabel}
+            {session.fontFace ? weightLabel : ""}
+          </span>
+        </span>
+        <span className="h-6 w-px bg-border" aria-hidden />
+        <label className="relative flex size-10 cursor-pointer items-center justify-center rounded-md hover:bg-muted" title="Text colour">
+          <span className="size-5 rounded-full border shadow-xs" style={{ backgroundColor: color }} />
+          <input
+            type="color"
+            value={/^#[0-9a-f]{6}$/i.test(color) ? color : "#000000"}
+            onChange={(e) => setColor(e.target.value)}
+            onBlur={() => {
+              inToolbar.current = false
+              ref.current?.focus({ preventScroll: true })
+            }}
+            aria-label="Text colour"
+            className="absolute inset-0 cursor-pointer opacity-0"
+          />
+        </label>
+        <div className="flex items-center rounded-md border">
+          <button type="button" onClick={() => stepSize(-0.5)} className="flex size-10 items-center justify-center hover:bg-muted" aria-label="Smaller text">
+            <Minus className="size-3.5" aria-hidden />
+          </button>
+          <span className="w-12 text-center font-mono text-xs tabular-nums">{fontSize}pt</span>
+          <button type="button" onClick={() => stepSize(0.5)} className="flex size-10 items-center justify-center hover:bg-muted" aria-label="Larger text">
+            <Plus className="size-3.5" aria-hidden />
+          </button>
+        </div>
+        <span className="h-6 w-px bg-border" aria-hidden />
+        <button type="button" onClick={() => finish(true)} className="flex h-10 items-center rounded-md px-3 text-xs font-medium hover:bg-muted">
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => finish(false)}
+          className="flex h-10 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          <Check className="size-3.5" aria-hidden /> Done
+        </button>
+        {missing.length > 0 && (
+          <p className="basis-full px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
+            <span className="font-medium text-foreground">{missing.slice(0, 6).join(" ")}</span>{" "}
+            {missing.length === 1 ? "isn’t" : "aren’t"} in this PDF’s embedded font, so {missing.length === 1 ? "it’s" : "they’re"}{" "}
+            drawn with {lookalike && lookalikeName ? <span className="capitalize">{lookalikeName}</span> : "a similar font"}
+            {lookalike ? " (a look-alike)" : ""}. Everything else keeps the original font.
+          </p>
+        )}
+      </div>
+
+      <span
+        className="absolute block rounded-[1px] outline-2 outline-offset-2 outline-primary"
+        style={{
+          left: x0 * scale,
+          top: metrics.top * scale,
+          fontSize: fontSize * scale,
+          lineHeight: `${metrics.lineGap * scale}px`,
+          wordSpacing: wordSpacing ? wordSpacing * scale : undefined,
+          color,
+          ...font,
+        }}
+      >
+        <span className="invisible block whitespace-pre" aria-hidden>
+          {value + "​"}
+        </span>
+        <textarea
+          ref={ref}
+          value={value}
+          aria-label="Edit PDF text"
+          wrap="off"
+          spellCheck={false}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={() => {
+            if (!inToolbar.current) finish(false)
+          }}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === "Escape") {
+              e.preventDefault()
+              finish(true)
+            } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault()
+              finish(false)
+            }
+          }}
+          className="absolute inset-0 m-0 block size-full resize-none overflow-hidden border-0 bg-transparent p-0 whitespace-pre outline-none selection:bg-primary/25"
+          style={{ font: "inherit", lineHeight: "inherit", wordSpacing: "inherit", color: "inherit", caretColor: color }}
+        />
+      </span>
+    </div>
   )
 }

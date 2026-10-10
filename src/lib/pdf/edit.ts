@@ -17,6 +17,10 @@
  * they can be upright on screen when placed on a rotated page.
  */
 
+import { LOOKALIKE_SUBSETS, loadLookalikeFile, lookalikeFontId } from "./font-info"
+import type { TextSpacing } from "./content-strip"
+import type { TextRun } from "./font-reuse"
+
 export type Rotation = 0 | 90 | 180 | 270
 
 export interface EditorPage {
@@ -87,9 +91,38 @@ export interface TextReplaceAnnotation {
   fontSize: number
   color: string
   bgColor: string
+  /** Fallback family/weight, used when the original font can't draw the new text. */
   fontFamily: "sans" | "serif" | "mono"
   fontWeight: "normal" | "bold"
   rotation: Rotation
+  /** Font name of the original text (PDF `/BaseFont`); the exporter re-uses that embedded font. */
+  pdfFontName?: string
+  /** CSS family of pdf.js's loaded copy of the original font, for the on-screen preview. */
+  fontFace?: string
+  /** Real family name from the embedded font program, e.g. "Calibri". */
+  fontRealFamily?: string
+  /** Numeric weight of the original font (400 regular, 700 bold). */
+  fontWeightValue?: number
+  italic?: boolean
+  /** True when `fontFace` is declared with the real weight/style (so CSS weight should match it). */
+  faceWeighted?: boolean
+  /** Generic CSS family to fall back to on screen ("sans-serif", "serif", "monospace"). */
+  fontFallback?: string
+  /** Draw with the original embedded font when it has the glyphs (default true). */
+  useOriginalFont?: boolean
+  /** Original text matrix with the font size divided out: [a, b, c, d]. */
+  matrix?: [number, number, number, number]
+  /** Distance between baselines for multi-line text, in points. */
+  lineGap?: number
+  /** Extra word spacing (pt) of a justified original line, for the on-screen preview. */
+  wordSpacing?: number
+  /** Font ascent/descent in em, used to place the on-screen baseline. */
+  ascent?: number
+  descent?: number
+  /** Original lines this replaces (normalised x/w/baseline, size in pt), removed from the page content on export. */
+  stripLines?: { x: number; w: number; baselineY: number; size: number }[]
+  /** Id of the editable text line/block this replaces (`…-b3` block or `…-b3-l1` line). */
+  sourceId?: string
 }
 
 export type Annotation = TextAnnotation | InkAnnotation | HighlightAnnotation | ImageAnnotation | TextReplaceAnnotation
@@ -251,6 +284,35 @@ export interface ExportResult {
   bytes: Uint8Array
   /** True when some characters couldn't be encoded in Helvetica and were replaced with "?". */
   replacedCharacters: boolean
+  /** Number of text edits where some characters were missing from the embedded font. */
+  substitutedFonts: number
+  /** True when a look-alike font couldn't be loaded and a standard PDF font was used instead. */
+  usedStandardFonts: boolean
+}
+
+/**
+ * CSS font-family for replaced text: the PDF's own font first, then the real
+ * family if installed (e.g. Calibri), then its open look-alike web font, then
+ * a generic stack. The browser fills glyphs missing from the subset from the
+ * next family, matching what the exporter does.
+ */
+export function replaceFontCss(
+  a: Pick<TextReplaceAnnotation, "fontFace" | "fontFallback" | "fontFamily" | "useOriginalFont" | "fontRealFamily">
+) {
+  const stack =
+    a.fontFamily === "serif"
+      ? "'Times New Roman', Times, Georgia, serif"
+      : a.fontFamily === "mono"
+        ? "'Courier New', Courier, monospace"
+        : PDF_FONT_STACK
+  const lookalike = lookalikeFontId(a.fontRealFamily)
+  const families = [
+    a.fontFace && a.useOriginalFont !== false ? `"${a.fontFace}"` : null,
+    a.fontRealFamily ? `"${a.fontRealFamily.replace(/"/g, "")}"` : null,
+    lookalike ? `"lk-fb-${lookalike}"` : null,
+    stack,
+  ]
+  return families.filter(Boolean).join(", ")
 }
 
 const tick = () => new Promise<void>((r) => setTimeout(r, 0))
@@ -265,6 +327,7 @@ export async function exportEditedPdf({
 }: ExportInput): Promise<ExportResult> {
   const progress = (f: number, label: string) => onProgress?.(Math.max(0, Math.min(1, f)), label)
   progress(0.02, "Loading PDF tools…")
+  const lib = await import("pdf-lib")
   const {
     PDFDocument,
     StandardFonts,
@@ -276,7 +339,10 @@ export async function exportEditedPdf({
     setLineJoin,
     pushGraphicsState,
     popGraphicsState,
-  } = await import("pdf-lib")
+  } = lib
+  const { findReusableFont } = await import("./font-reuse")
+  const { stripOriginalText } = await import("./content-strip")
+  const standardWidths = await import("./standard-metrics").then((m) => m.loadStandardWidths()).catch(() => undefined)
 
   progress(0.06, "Reading the original file…")
   await tick()
@@ -323,31 +389,90 @@ export async function exportEditedPdf({
   }
 
   const font = await out.embedFont(StandardFonts.Helvetica)
-  const fontBold = await out.embedFont(StandardFonts.HelveticaBold)
-  const times = await out.embedFont(StandardFonts.TimesRoman)
-  const timesBold = await out.embedFont(StandardFonts.TimesRomanBold)
-  const courier = await out.embedFont(StandardFonts.Courier)
-  const courierBold = await out.embedFont(StandardFonts.CourierBold)
   let replaced = false
+  let substituted = 0
+  let usedStandard = false
+  type EmbeddedFont = typeof font
+  type PdfPage = ReturnType<typeof out.addPage>
+
+  // Standard fonts by family/weight/style, embedded on first use.
+  const standards = new Map<string, Promise<EmbeddedFont>>()
+  const standardFor = (a: TextReplaceAnnotation) => {
+    const bold = (a.fontWeightValue ?? (a.fontWeight === "bold" ? 700 : 400)) >= 600
+    const italic = Boolean(a.italic)
+    const name =
+      a.fontFamily === "serif"
+        ? [StandardFonts.TimesRoman, StandardFonts.TimesRomanBold, StandardFonts.TimesRomanItalic, StandardFonts.TimesRomanBoldItalic]
+        : a.fontFamily === "mono"
+          ? [StandardFonts.Courier, StandardFonts.CourierBold, StandardFonts.CourierOblique, StandardFonts.CourierBoldOblique]
+          : [StandardFonts.Helvetica, StandardFonts.HelveticaBold, StandardFonts.HelveticaOblique, StandardFonts.HelveticaBoldOblique]
+    const pick = name[(bold ? 1 : 0) + (italic ? 2 : 0)]
+    if (!standards.has(pick)) standards.set(pick, out.embedFont(pick))
+    return standards.get(pick)!
+  }
+
+  // Look-alike open fonts (e.g. Carlito for Calibri) for glyphs a subset lacks.
+  const lookalikes = new Map<string, Promise<EmbeddedFont | null>>()
+  let fontkitRegistered = false
+  const lookalikeFor = async (a: TextReplaceAnnotation, text: string): Promise<EmbeddedFont | null> => {
+    const id = lookalikeFontId(a.fontRealFamily)
+    if (!id) return null
+    const weight = a.fontWeightValue ?? (a.fontWeight === "bold" ? 700 : 400)
+    const italic = Boolean(a.italic)
+    for (const subset of LOOKALIKE_SUBSETS) {
+      const file = await loadLookalikeFile(id, weight, italic, subset)
+      if (!file) continue
+      if (!Array.from(text).every((ch) => /\s/.test(ch) || file.has(ch.codePointAt(0)!))) continue
+      const key = `${id}:${weight}:${italic}:${subset}`
+      if (!lookalikes.has(key)) {
+        lookalikes.set(
+          key,
+          (async () => {
+            if (!fontkitRegistered) {
+              out.registerFontkit((await import("@pdf-lib/fontkit")).default)
+              fontkitRegistered = true
+            }
+            return out.embedFont(file.bytes, { subset: false })
+          })().catch(() => null)
+        )
+      }
+      const f = await lookalikes.get(key)!
+      if (f) return f
+    }
+    return null
+  }
+
+  // One resource name per font per page.
+  const fontKeys = new WeakMap<object, Map<EmbeddedFont, ReturnType<PdfPage["node"]["newFontDictionary"]>>>()
+  const fontKey = (page: PdfPage, f: EmbeddedFont) => {
+    let m = fontKeys.get(page)
+    if (!m) fontKeys.set(page, (m = new Map()))
+    let k = m.get(f)
+    if (!k) m.set(f, (k = page.node.newFontDictionary(f.name, f.ref)))
+    return k
+  }
+
   const encodable = new Map<string, boolean>()
-  const sanitize = (text: string) =>
+  const sanitizeFor = (f: EmbeddedFont, text: string) =>
     Array.from(text.replace(/\t/g, "    "))
       .map((ch) => {
-        let ok = encodable.get(ch)
+        const cacheKey = `${f.name}\u0000${ch}`
+        let ok = encodable.get(cacheKey)
         if (ok === undefined) {
           try {
-            font.encodeText(ch)
-            font.widthOfTextAtSize(ch, 10)
+            f.encodeText(ch)
+            f.widthOfTextAtSize(ch, 10)
             ok = true
           } catch {
             ok = false
           }
-          encodable.set(ch, ok)
+          encodable.set(cacheKey, ok)
         }
         if (!ok) replaced = true
         return ok ? ch : "?"
       })
       .join("")
+  const sanitize = (text: string) => sanitizeFor(font, text)
 
   const color = (hex: string) => {
     const [r, g, b] = hexToRgb01(hex)
@@ -367,9 +492,67 @@ export async function exportEditedPdf({
 
     const rotation = meta.rotation
     page.setRotation(degrees(rotation))
+    const pageAnnotations = annotations[meta.id] ?? []
     const crop = page.getCropBox()
     const W = crop.width
     const H = crop.height
+
+    // Remove the original glyphs of edited lines from the content itself.
+    // Lines we can't remove safely keep a cover box instead.
+    const cleanReplace = new Set<string>()
+    const spacingFor = new Map<string, TextSpacing>()
+    const stripped = pageAnnotations.filter(
+      (a): a is TextReplaceAnnotation => a.type === "text-replace" && Boolean(a.pdfFontName && a.stripLines?.length)
+    )
+    if (stripped.length) {
+      const owners: string[] = []
+      const targets = stripped.flatMap((a) =>
+        a.stripLines!.map((l) => {
+          owners.push(a.id)
+          return {
+            x0: crop.x + l.x * W,
+            x1: crop.x + (l.x + l.w) * W,
+            baseline: crop.y + H - l.baselineY * H,
+            fontSize: l.size,
+            fontName: a.pdfFontName!,
+          }
+        })
+      )
+      try {
+        page.node.normalize()
+        const { clean, spacing } = stripOriginalText(lib, out, page, targets, standardWidths)
+        owners.forEach((id, k) => {
+          const sp = spacing[k]
+          if (sp && !spacingFor.has(id)) spacingFor.set(id, sp)
+        })
+        for (const a of stripped) {
+          if (owners.every((id, k) => id !== a.id || clean[k])) cleanReplace.add(a.id)
+        }
+      } catch {
+        // leave the content as is; covers are drawn below
+      }
+    }
+
+    if (pageAnnotations.length || wmText || pageNumbers.enabled) {
+      // Isolate the original content so an unbalanced transform in it can't shift our drawing.
+      page.node.normalize()
+      const start = out.context.register(out.context.flateStream("q\n"))
+      const end = out.context.register(out.context.flateStream("\nQ\n"))
+      page.node.wrapContentStreams(start, end)
+    }
+    const reusable = new Map<string, ReturnType<typeof findReusableFont>>()
+    const originalFont = (name: string) => {
+      if (!reusable.has(name)) {
+        let f: ReturnType<typeof findReusableFont> = null
+        try {
+          f = findReusableFont(lib, out, page, name)
+        } catch {
+          f = null
+        }
+        reusable.set(name, f)
+      }
+      return reusable.get(name)!
+    }
     const toPdf = (nx: number, ny: number) => ({ x: crop.x + nx * W, y: crop.y + H - ny * H })
     const [VW, VH] = rotation % 180 === 0 ? [W, H] : [H, W]
     const visToPdf = (vx: number, vy: number) => {
@@ -377,64 +560,106 @@ export async function exportEditedPdf({
       return toPdf(nx, ny)
     }
 
-    for (const a of annotations[meta.id] ?? []) {
+    for (const a of pageAnnotations) {
       switch (a.type) {
         case "text-replace": {
-          // 1. Draw solid background cover over the original text to erase it completely
-          // Tiny bleed ensures full coverage of anti-aliased edge pixels without overlapping nearby lines
-          const bleedX = 1
-          const bleedY = 1.2
-          page.drawRectangle({
-            x: crop.x + a.x * W - bleedX,
-            y: crop.y + H - (a.y + a.h) * H - bleedY,
-            width: a.w * W + bleedX * 2,
-            height: a.h * H + bleedY * 2,
-            color: color(a.bgColor || "#ffffff"),
-            opacity: 1,
-          })
+          // 1. Hide the original text. Usually it was removed from the content
+          //    above; otherwise paint a cover box (with a tiny bleed for anti-aliasing).
+          if (!cleanReplace.has(a.id)) {
+            const bleedX = 1
+            const bleedY = 1.2
+            page.drawRectangle({
+              x: crop.x + a.x * W - bleedX,
+              y: crop.y + H - (a.y + a.h) * H - bleedY,
+              width: a.w * W + bleedX * 2,
+              height: a.h * H + bleedY * 2,
+              color: color(a.bgColor || "#ffffff"),
+              opacity: 1,
+            })
+          }
 
           if (!a.text || !a.text.trim()) break
 
-          // 2. Select matching vector font based on family and weight
-          const chosenFont =
-            a.fontFamily === "serif"
-              ? a.fontWeight === "bold"
-                ? timesBold
-                : times
-              : a.fontFamily === "mono"
-                ? a.fontWeight === "bold"
-                  ? courierBold
-                  : courier
-                : a.fontWeight === "bold"
-                  ? fontBold
-                  : font
+          // 2. Redraw the text at the original text matrix. Characters the
+          //    embedded font has use that font; any it lacks use a look-alike.
+          const lineGap = a.lineGap ?? a.fontSize * TEXT_LINE_HEIGHT
+          const [ma, mb, mc, md] = a.matrix ?? [1, 0, 0, 1]
+          const upLen = Math.hypot(mc, md) || 1
+          const up = { x: mc / upLen, y: md / upLen }
+          const x0 = crop.x + a.x * W
+          const y0 =
+            a.baselineY !== undefined ? crop.y + H - a.baselineY * H : crop.y + H - a.y * H - a.fontSize * TEXT_BASELINE
+          const reuse = a.pdfFontName && a.useOriginalFont !== false ? originalFont(a.pdfFontName) : null
+          const [r, g, b] = hexToRgb01(a.color)
+          page.pushOperators(
+            pushGraphicsState(),
+            lib.beginText(),
+            lib.setFillingRgbColor(r, g, b),
+            // Keep the original letter/word spacing (e.g. tracked headings).
+            lib.setCharacterSpacing(spacingFor.get(a.id)?.charSpacing ?? 0),
+            lib.setWordSpacing(spacingFor.get(a.id)?.wordSpacing ?? 0),
+            lib.setCharacterSqueeze(100),
+            lib.setTextRise(0),
+            lib.setTextRenderingMode(lib.TextRenderingMode.Fill)
+          )
+          let borrowed = false
+          const lines = a.text.split(/\r?\n/)
+          const originalLines = (a.originalText ?? "").split(/\r?\n/)
+          const spaces = (t: string) => (t.match(/ /g) ?? []).length
+          const tracking = (t: string) => (spacingFor.get(a.id)?.charSpacing ?? 0) * Array.from(t).length
+          for (let li = 0; li < lines.length; li++) {
+            const line = lines[li]
+            if (!line.trim()) continue
+            const plain: TextRun[] = reuse ? reuse.encodeRuns(line) : [{ kind: "missing", text: line }]
+            // Resolve fonts for characters the original font lacks.
+            const fallbacks = new Map<number, { f: EmbeddedFont; text: string; look: boolean }>()
+            for (let k = 0; k < plain.length; k++) {
+              const run = plain[k]
+              if (run.kind !== "missing") continue
+              if (reuse) borrowed = true
+              const look = await lookalikeFor(a, run.text)
+              const f = look ?? (await standardFor(a))
+              if (!look) usedStandard = true
+              fallbacks.set(k, { f, text: look ? run.text : sanitizeFor(f, run.text), look: Boolean(look) })
+            }
 
-          // 3. Draw replacement text in the exact position
-          const rad = (a.rotation * Math.PI) / 180
-          const down = { x: -Math.sin(rad), y: -Math.cos(rad) }
-          const anchor = toPdf(a.x, a.y)
-          const baselinePdfY = a.baselineY !== undefined ? crop.y + H - a.baselineY * H : null
+            // Justified original line: keep its width by widening the spaces.
+            let spaceExtra = 0
+            const strip = a.stripLines?.length === lines.length ? a.stripLines[li] : undefined
+            const orig = originalLines.length === lines.length ? originalLines[li] : undefined
+            if (reuse && strip && orig !== undefined && Math.abs(strip.size - a.fontSize) < 0.01 && spaces(orig) && spaces(line)) {
+              const sx = Math.hypot(ma, mb) || 1
+              const actual = (strip.w * W) / sx
+              const perSpace = (actual - (reuse.measure(orig) * a.fontSize) / 1000 - tracking(orig)) / spaces(orig)
+              if (Number.isFinite(perSpace) && perSpace > a.fontSize * 0.03) {
+                let natural = (reuse.measure(line) * a.fontSize) / 1000 + tracking(line)
+                for (const fb of fallbacks.values()) natural += fb.f.widthOfTextAtSize(fb.text, a.fontSize)
+                const extra = Math.min(perSpace * 3 + a.fontSize * 0.25, Math.max(0, (actual - natural) / spaces(line)))
+                spaceExtra = (extra * 1000) / a.fontSize
+              }
+            }
+            const runs = spaceExtra && reuse ? reuse.encodeRuns(line, spaceExtra) : plain
 
-          a.text
-            .split(/\r?\n/)
-            .map(sanitize)
-            .forEach((line, li) => {
-              if (!line.trim()) return
-              const textY =
-                baselinePdfY !== null
-                  ? baselinePdfY + down.y * (li * a.fontSize * TEXT_LINE_HEIGHT)
-                  : anchor.y + down.y * a.fontSize * (TEXT_BASELINE + li * TEXT_LINE_HEIGHT)
-              const textX = anchor.x + down.x * (li * a.fontSize * TEXT_LINE_HEIGHT)
-
-              page.drawText(line, {
-                x: textX,
-                y: textY,
-                size: a.fontSize,
-                font: chosenFont,
-                color: color(a.color),
-                rotate: degrees(-a.rotation),
-              })
-            })
+            page.pushOperators(lib.setTextMatrix(ma, mb, mc, md, x0 - up.x * lineGap * li, y0 - up.y * lineGap * li))
+            for (let k = 0; k < runs.length; k++) {
+              const run = runs[k]
+              if (run.kind === "original") {
+                const arr = out.context.obj([])
+                for (const p of run.pieces) arr.push("hex" in p ? lib.PDFHexString.of(p.hex) : lib.PDFNumber.of(-p.gap))
+                page.pushOperators(
+                  lib.setFontAndSize(reuse!.key, a.fontSize),
+                  lib.PDFOperator.of(lib.PDFOperatorNames.ShowTextAdjusted, [arr])
+                )
+                continue
+              }
+              // Runs line up 1:1 with `plain`: spacing only changes inside original-font runs.
+              const fb = fallbacks.get(k)
+              if (!fb) continue
+              page.pushOperators(lib.setFontAndSize(fontKey(page, fb.f), a.fontSize), lib.showText(fb.f.encodeText(fb.text)))
+            }
+          }
+          page.pushOperators(lib.endText(), popGraphicsState())
+          if (borrowed) substituted++
           break
         }
         case "highlight": {
@@ -544,5 +769,5 @@ export async function exportEditedPdf({
   await tick()
   const result = await out.save({ objectsPerTick: 100 })
   progress(1, "Done")
-  return { bytes: result, replacedCharacters: replaced }
+  return { bytes: result, replacedCharacters: replaced, substitutedFonts: substituted, usedStandardFonts: usedStandard }
 }

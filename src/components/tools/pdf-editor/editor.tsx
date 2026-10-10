@@ -287,6 +287,15 @@ export function PdfEditorWorkspace({ session, onClose }: { session: EditorSessio
       if (res.replacedCharacters) {
         toast.warning("Some characters aren't supported by the PDF font and were replaced with “?”.")
       }
+      if (res.usedStandardFonts) {
+        toast.warning(
+          "Some typed characters aren't in the PDF's embedded font and a look-alike font couldn't be downloaded, so a standard PDF font was used for just those characters."
+        )
+      } else if (res.substitutedFonts > 0) {
+        toast.info(
+          `${res.substitutedFonts} edit${res.substitutedFonts === 1 ? "" : "s"} used characters the embedded font didn't include; those were drawn with a matching look-alike font.`
+        )
+      }
     } catch (err) {
       console.error(err)
       const message =
@@ -469,7 +478,7 @@ export function PdfEditorWorkspace({ session, onClose }: { session: EditorSessio
 
   const fontNotice = (
     <p className="text-xs text-muted-foreground">
-      Replaced text automatically matches the original font family, weight, and color. Added text uses standard PDF fonts.
+      Edited text reuses the font embedded in this PDF, with its exact colour, and the old words are removed from the page. If you type a character that font doesn’t include, a matching look-alike font file is downloaded for just those characters — your PDF itself never leaves your browser. Added text uses standard PDF fonts.
     </p>
   )
 
@@ -581,10 +590,11 @@ export function PdfEditorWorkspace({ session, onClose }: { session: EditorSessio
                 onFinishEditing={finishEditing}
                 onAdd={(a, opts) => editor.apply((d) => ({ ...d, annotations: { ...d.annotations, [page.id]: [...(d.annotations[page.id] ?? []), a] } }), opts)}
                 onUpdate={(id, patch, opts) => editor.updateAnnotation(page.id, id, patch, opts)}
-                onRemove={(id) => {
-                  editor.removeAnnotation(page.id, id)
+                onRemove={(id, opts) => {
+                  editor.removeAnnotation(page.id, id, opts)
                   setSelectedId(null)
                 }}
+                onCommit={editor.commit}
                 snapshot={snapshot}
               />
             </div>

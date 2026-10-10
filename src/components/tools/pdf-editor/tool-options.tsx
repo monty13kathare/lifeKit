@@ -189,15 +189,18 @@ export function ToolOptions({
   if (tool === "edit-text") {
     return (
       <div className={cn(compact ? "flex items-center gap-2 overflow-x-auto" : "space-y-3")}>
-        {compact && <p className="py-2 text-xs text-muted-foreground">Tap any text on the page to replace or erase it.</p>}
+        {compact && <p className="py-2 text-xs text-muted-foreground">Tap any text on the page and type to change it.</p>}
         {!compact && (
           <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground space-y-1.5">
             <p className="font-semibold text-foreground flex items-center gap-1.5">
-              <Pencil className="size-3.5 text-primary" /> Replace existing PDF text
+              <Pencil className="size-3.5 text-primary" /> Edit text in place
             </p>
-            <p>
-              Hover over and click any text inside the PDF to edit or replace it with auto-detected font, size, and color.
-            </p>
+            <ol className="list-decimal space-y-1 pl-4">
+              <li>Click any heading, line or paragraph on the page.</li>
+              <li>Type your changes right there — the original font, size and colour are kept.</li>
+              <li>Click outside or press Done to save. Esc cancels.</li>
+            </ol>
+            <p>Only the lines you change are replaced; everything else stays exactly as it was.</p>
           </div>
         )}
       </div>

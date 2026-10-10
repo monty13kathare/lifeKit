@@ -20,11 +20,14 @@ export function loadPdfJs(): Promise<PdfJs> {
   return promise
 }
 
-/** Open a PDF from bytes. Pass a copy if you still need the original buffer (pdf.js detaches it). */
-export async function openPdf(data: ArrayBuffer | Uint8Array) {
+/**
+ * Open a PDF from bytes. Pass a copy if you still need the original buffer (pdf.js detaches it).
+ * `keepFontData` keeps each embedded font's program in memory (the PDF editor reads it to match fonts).
+ */
+export async function openPdf(data: ArrayBuffer | Uint8Array, opts: { keepFontData?: boolean } = {}) {
   const pdfjs = await loadPdfJs()
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data)
-  return pdfjs.getDocument({ data: bytes }).promise
+  return pdfjs.getDocument({ data: bytes, fontExtraProperties: Boolean(opts.keepFontData) }).promise
 }
 
 /** Render one page (1-based) to a canvas at the given scale. */
